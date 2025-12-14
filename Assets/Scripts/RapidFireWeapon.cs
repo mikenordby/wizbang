@@ -1,46 +1,108 @@
 using UnityEngine;
 
 /// <summary>
-/// Rapid-fire pistol weapon that shoots straight ahead at high speed.
-/// Placeholder for future implementation.
+/// Rapid-fire pistol weapon that shoots at nearest enemy at high speed.
+/// Low damage, high fire rate - spray and pray!
 /// </summary>
 public class RapidFireWeapon : Weapon
 {
     [Header("Rapid Fire Settings")]
-    #pragma warning disable 0414 // Suppress unused field warning for placeholder implementation
     [SerializeField] private float bulletSpeed = 15f; // Faster than magic missile
-    [SerializeField] private float spreadAngle = 5f; // Tight spread
-    #pragma warning restore 0414
+    [SerializeField] private float spreadAngle = 8f; // Slight spread for multiple projectiles
+    
+    private ProjectilePool projectilePool;
     
     protected override void Awake()
     {
-        base.Awake();
-        
-        // Set weapon identity
+        // Set weapon identity BEFORE base.Awake()
         weaponName = "Rapid Fire Pistol";
-        baseDamage = 5f; // Lower damage per shot
-        baseFireRate = 5f; // MUCH faster fire rate (5 shots per second)
+        baseDamage = 5f; // LOW damage per shot
+        baseFireRate = 4f; // MUCH faster fire rate (4 shots per second)
         projectileCount = 1;
         basePierce = 0; // No pierce by default
         baseRange = 0.8f; // Shorter range
         
-        DebugLog.Info("[RapidFireWeapon] Initialized (placeholder - full implementation pending)");
+        base.Awake();
+        
+        projectilePool = GameServices.ProjectilePool;
+        
+        DebugLog.Info("[RapidFireWeapon] Initialized - spray and pray!");
     }
     
     protected override void Fire()
     {
-        // TODO: Implement rapid fire logic
-        // 1. Shoot straight ahead (no auto-aim, shoots in player's facing direction)
-        // 2. Spawn fast-moving bullet projectile
-        // 3. Apply tight spread if projectileCount > 1
-        // 4. Visual: muzzle flash effect
-        // 5. Audio: rapid "pew pew" sound
+        if (projectilePool == null) return;
         
-        DebugLog.Verbose("[RapidFireWeapon] Fire() called (not yet implemented)");
+        // Find nearest enemy for auto-aim
+        Transform nearestEnemy = FindNearestEnemy();
+        Vector3 baseDirection;
+        
+        if (nearestEnemy != null)
+        {
+            baseDirection = (nearestEnemy.position - playerTransform.position).normalized;
+        }
+        else
+        {
+            // No enemy, shoot in random direction
+            float randomAngle = Random.Range(0f, 360f);
+            float rad = randomAngle * Mathf.Deg2Rad;
+            baseDirection = new Vector3(Mathf.Cos(rad), Mathf.Sin(rad), 0f);
+        }
+        
+        // Spawn bullets with slight spread
+        float angleStep = currentProjectileCount > 1 ? spreadAngle / (currentProjectileCount - 1) : 0f;
+        float startAngle = -spreadAngle / 2f;
+        
+        for (int i = 0; i < currentProjectileCount; i++)
+        {
+            Projectile bullet = projectilePool.GetProjectile();
+            if (bullet == null) continue;
+            
+            // Apply spread
+            float angleOffset = startAngle + (angleStep * i);
+            float baseAngle = Mathf.Atan2(baseDirection.y, baseDirection.x) * Mathf.Rad2Deg;
+            float finalAngle = (baseAngle + angleOffset) * Mathf.Deg2Rad;
+            Vector3 shootDir = new Vector3(Mathf.Cos(finalAngle), Mathf.Sin(finalAngle), 0f);
+            
+            // Spawn bullet
+            bullet.transform.position = playerTransform.position;
+            bullet.ActivateStraight(playerTransform.position, shootDir);
+            bullet.SetStats(currentDamage, currentPierce);
+            
+            // Make bullets yellow and small
+            SpriteRenderer sr = bullet.GetComponent<SpriteRenderer>();
+            if (sr != null)
+            {
+                sr.sprite = SpriteLoader.LoadProjectileSprite("fireball");
+                sr.color = Color.yellow;
+                bullet.transform.localScale = Vector3.one * 0.5f; // Smaller bullets
+            }
+        }
+        
+        DebugLog.Verbose($"[RapidFireWeapon] Fired {currentProjectileCount} bullet(s)");
     }
     
-    // TODO: Create BulletProjectile class (faster, smaller sprite)
-    // TODO: Implement player facing direction tracking
-    // TODO: Add muzzle flash particle effect
-    // TODO: Consider recoil or screen shake on rapid fire
+    private Transform FindNearestEnemy()
+    {
+        EnemyPool enemyPool = GameServices.EnemyPool;
+        if (enemyPool == null) return null;
+        
+        var enemies = enemyPool.GetActiveEnemies();
+        Enemy nearest = null;
+        float nearestDistance = float.MaxValue;
+        
+        foreach (var enemy in enemies)
+        {
+            if (enemy == null || !enemy.IsActive) continue;
+            
+            float distance = Vector3.Distance(playerTransform.position, enemy.transform.position);
+            if (distance < nearestDistance)
+            {
+                nearestDistance = distance;
+                nearest = enemy;
+            }
+        }
+        
+        return nearest != null ? nearest.transform : null;
+    }
 }

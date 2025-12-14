@@ -1,43 +1,145 @@
 using UnityEngine;
+using System.Collections.Generic;
 
 /// <summary>
 /// Boomerang weapon that throws projectiles in an arc that return to player.
-/// Placeholder for future implementation.
+/// Boomerangs damage enemies on the way out AND back.
 /// </summary>
 public class BoomerangWeapon : Weapon
 {
     [Header("Boomerang Settings")]
-    #pragma warning disable 0414 // Suppress unused field warnings for placeholder implementation
     [SerializeField] private float throwDistance = 8f;
-    [SerializeField] private float arcHeight = 2f;
-    #pragma warning restore 0414
+    [SerializeField] private float returnSpeed = 12f;
+    
+    private List<BoomerangProjectile> boomerangPool = new List<BoomerangProjectile>();
+    private int poolSize = 20;
     
     protected override void Awake()
     {
-        base.Awake();
-        
-        // Set weapon identity
+        // Set weapon identity BEFORE base.Awake()
         weaponName = "Boomerang";
         baseDamage = 12f;
         baseFireRate = 0.8f; // Slightly slower than Magic Missile
         projectileCount = 1;
-        basePierce = 2; // Boomerang can hit multiple enemies on the way out AND back
+        basePierce = 5; // Can hit multiple enemies on the way out AND back
+        baseRange = 1.2f;
         
-        DebugLog.Info("[BoomerangWeapon] Initialized (placeholder - full implementation pending)");
+        base.Awake();
+        
+        // Create boomerang pool
+        CreateBoomerangPool();
+        
+        DebugLog.Info("[BoomerangWeapon] Initialized with arc throw pattern");
+    }
+    
+    private void CreateBoomerangPool()
+    {
+        for (int i = 0; i < poolSize; i++)
+        {
+            GameObject boomerangObj = new GameObject($"Boomerang_{i}");
+            boomerangObj.transform.SetParent(transform);
+            boomerangObj.transform.localScale = Vector3.one * 0.8f;
+            
+            // Add sprite
+            SpriteRenderer sr = boomerangObj.AddComponent<SpriteRenderer>();
+            sr.sprite = SpriteLoader.LoadBoomerangSprite();
+            sr.sortingOrder = 5;
+            
+            // Add collider
+            CircleCollider2D collider = boomerangObj.AddComponent<CircleCollider2D>();
+            collider.radius = 0.25f;
+            collider.isTrigger = true;
+            
+            // Add boomerang component
+            BoomerangProjectile boomerang = boomerangObj.AddComponent<BoomerangProjectile>();
+            boomerangObj.SetActive(false);
+            
+            boomerangPool.Add(boomerang);
+        }
+        
+        DebugLog.Info($"[BoomerangWeapon] Created pool of {poolSize} boomerangs");
+    }
+    
+    private BoomerangProjectile GetBoomerang()
+    {
+        foreach (var boomerang in boomerangPool)
+        {
+            if (!boomerang.IsActive)
+            {
+                boomerang.gameObject.SetActive(true);
+                return boomerang;
+            }
+        }
+        
+        DebugLog.Warning("[BoomerangWeapon] Pool exhausted!");
+        return null;
     }
     
     protected override void Fire()
     {
-        // TODO: Implement boomerang throw logic
-        // 1. Find nearest enemy or random direction if no enemies
-        // 2. Spawn boomerang projectile
-        // 3. Set arc trajectory (out -> apex -> return)
-        // 4. Boomerang damages on both outward and return trips
+        // Get spread angle based on projectile count
+        float spreadAngle = currentProjectileCount > 1 ? 30f : 0f;
+        float angleStep = currentProjectileCount > 1 ? spreadAngle / (currentProjectileCount - 1) : 0f;
+        float startAngle = -spreadAngle / 2f;
         
-        DebugLog.Verbose("[BoomerangWeapon] Fire() called (not yet implemented)");
+        for (int i = 0; i < currentProjectileCount; i++)
+        {
+            BoomerangProjectile boomerang = GetBoomerang();
+            if (boomerang == null) continue;
+            
+            // Calculate throw direction with spread
+            float angle = startAngle + (angleStep * i);
+            Vector3 targetDir = FindTargetDirection(angle);
+            
+            // Activate boomerang with arc motion
+            boomerang.ActivateArc(playerTransform.position, targetDir, playerTransform);
+            boomerang.SetStats(currentDamage, currentPierce);
+        }
+        
+        DebugLog.Verbose($"[BoomerangWeapon] Fired {currentProjectileCount} boomerang(s)");
     }
     
-    // TODO: Create BoomerangProjectile class with arc movement
-    // TODO: Implement return-to-player logic
-    // TODO: Handle multiple boomerangs with spread pattern
+    private Vector3 FindTargetDirection(float angleOffset)
+    {
+        // Find nearest enemy
+        Transform nearestEnemy = FindNearestEnemy();
+        
+        if (nearestEnemy != null)
+        {
+            Vector3 toEnemy = (nearestEnemy.position - playerTransform.position).normalized;
+            // Apply angle offset
+            float angle = Mathf.Atan2(toEnemy.y, toEnemy.x) * Mathf.Rad2Deg + angleOffset;
+            float radians = angle * Mathf.Deg2Rad;
+            return new Vector3(Mathf.Cos(radians), Mathf.Sin(radians), 0f);
+        }
+        
+        // No enemy, throw in random direction with offset
+        float randomAngle = Random.Range(0f, 360f) + angleOffset;
+        float randomRadians = randomAngle * Mathf.Deg2Rad;
+        return new Vector3(Mathf.Cos(randomRadians), Mathf.Sin(randomRadians), 0f);
+    }
+    
+    private Transform FindNearestEnemy()
+    {
+        EnemyPool enemyPool = GameServices.EnemyPool;
+        if (enemyPool == null) return null;
+        
+        var enemies = enemyPool.GetActiveEnemies();
+        Enemy nearest = null;
+        float nearestDistance = float.MaxValue;
+        
+        foreach (var enemy in enemies)
+        {
+            if (enemy == null || !enemy.IsActive) continue;
+            
+            float distance = Vector3.Distance(playerTransform.position, enemy.transform.position);
+            if (distance < nearestDistance)
+            {
+                nearestDistance = distance;
+                nearest = enemy;
+            }
+        }
+        
+        return nearest != null ? nearest.transform : null;
+    }
 }

@@ -14,7 +14,7 @@ public class OrbiterWeapon : Weapon
         weaponName = "Orbiting Blades";
         baseDamage = 15f;
         baseFireRate = 0f; // Always active, no firing
-        projectileCount = 2; // Start with 2 orbiters
+        projectileCount = 1; // Start with 1 orbiter, upgrades add more
         
         base.Awake(); // This calls RecalculateStats()
         
@@ -44,6 +44,11 @@ public class OrbiterWeapon : Weapon
     {
         base.RecalculateStats();
         
+        // DIAGNOSTIC: Log projectile count calculation
+        int upgradeBonus = upgrades[WeaponUpgrade.UpgradeType.ProjectileCount].GetProjectileBonus();
+        int playerBonus = (player != null) ? player.BonusProjectiles : 0;
+        DebugLog.Info($"[OrbiterWeapon.RecalculateStats] projectileCount={projectileCount}, upgradeBonus={upgradeBonus}, playerBonus={playerBonus}, TOTAL currentProjectileCount={currentProjectileCount}");
+        
         // Update orbiter manager with new stats
         if (orbiterManager != null)
         {
@@ -59,15 +64,23 @@ public class OrbiterWeapon : Weapon
     /// </summary>
     public override bool ApplyUpgrade(WeaponUpgrade.UpgradeType upgradeType)
     {
+        DebugLog.Info($"[OrbiterWeapon.ApplyUpgrade] BEFORE: upgradeType={upgradeType}, currentProjectileCount={currentProjectileCount}");
+        
         bool success = base.ApplyUpgrade(upgradeType);
         
         if (success)
         {
+            DebugLog.Info($"[OrbiterWeapon.ApplyUpgrade] AFTER: Upgrade successful, currentProjectileCount={currentProjectileCount}");
+            
             // ProjectileCount upgrade adds more orbiters
             if (upgradeType == WeaponUpgrade.UpgradeType.ProjectileCount)
             {
-                DebugLog.Info($"[OrbiterWeapon] Increased orbiter count to {currentProjectileCount}");
+                DebugLog.Info($"[OrbiterWeapon] ✓ ProjectileCount upgraded! New count: {currentProjectileCount}");
             }
+        }
+        else
+        {
+            DebugLog.Warning($"[OrbiterWeapon.ApplyUpgrade] Upgrade FAILED for {upgradeType}");
         }
         
         return success;

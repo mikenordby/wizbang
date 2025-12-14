@@ -121,6 +121,9 @@ public class Player : MonoBehaviour, ICollidable
         Sprite oldSprite = sr.sprite;
         sr.sprite = SpriteLoader.LoadWizardSprite();
         
+        // Make wizard larger and more visible
+        transform.localScale = Vector3.one * 2.0f;
+        
         if (sr.sprite != null)
         {
             DebugLog.Info($"Player.Start: Sprite set - Size: {sr.sprite.texture.width}x{sr.sprite.texture.height}px, PPU: {sr.sprite.pixelsPerUnit}, Scale: {transform.localScale}");

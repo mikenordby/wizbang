@@ -137,6 +137,22 @@ public static class SpriteLoader
     }
     
     /// <summary>
+    /// Load boomerang projectile sprite with procedural fallback
+    /// </summary>
+    public static Sprite LoadBoomerangSprite()
+    {
+        Sprite sprite = LoadSprite("Projectiles/boomerang");
+        
+        if (sprite == null && useProceduralFallback)
+        {
+            DebugLog.Verbose("[SpriteLoader] Using procedural boomerang sprite as fallback");
+            sprite = SpriteGenerator.CreateBoomerangSprite();
+        }
+        
+        return sprite;
+    }
+    
+    /// <summary>
     /// Load XP gem sprite with procedural fallback
     /// </summary>
     public static Sprite LoadXPGemSprite()

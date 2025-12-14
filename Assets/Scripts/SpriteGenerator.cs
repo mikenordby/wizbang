@@ -393,6 +393,56 @@ public static class SpriteGenerator
     }
     
     /// <summary>
+    /// Create a boomerang sprite (curved blade)
+    /// </summary>
+    public static Sprite CreateBoomerangSprite()
+    {
+        int size = 64;
+        var (texture, pixels) = CreateProceduralTexture(size);
+        
+        int cx = size / 2;
+        int cy = size / 2;
+        
+        Color bladeColor = new Color(0.7f, 0.5f, 0.2f); // Brown wood
+        Color edgeColor = new Color(0.9f, 0.85f, 0.8f); // Light edge
+        Color detailColor = new Color(0.5f, 0.3f, 0.1f); // Dark brown detail
+        
+        // Draw curved boomerang shape (V-shaped)
+        // Left arm
+        for (int i = 0; i < 20; i++)
+        {
+            float t = i / 20f;
+            int x = cx - 20 + (int)(t * 8);
+            int y = cy + (int)(t * t * 15);
+            
+            DrawCircle(pixels, size, x, y, 3, bladeColor);
+            DrawCircle(pixels, size, x, y, 2, edgeColor);
+        }
+        
+        // Right arm  
+        for (int i = 0; i < 20; i++)
+        {
+            float t = i / 20f;
+            int x = cx + 20 - (int)(t * 8);
+            int y = cy + (int)(t * t * 15);
+            
+            DrawCircle(pixels, size, x, y, 3, bladeColor);
+            DrawCircle(pixels, size, x, y, 2, edgeColor);
+        }
+        
+        // Center grip
+        for (int y = cy - 3; y <= cy + 3; y++)
+        {
+            for (int x = cx - 4; x <= cx + 4; x++)
+            {
+                SetPixel(pixels, size, x, y, detailColor);
+            }
+        }
+        
+        return FinalizeSprite(texture, pixels, size, 64);
+    }
+    
+    /// <summary>
     /// Create an XP gem sprite (cyan glowing gem) - LARGER AND MORE DETAILED
     /// </summary>
     public static Sprite CreateXPGemSprite()

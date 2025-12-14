@@ -166,6 +166,48 @@ public class LevelUpUI : MonoBehaviour
             }
         }
         
+        // Level 3: Guarantee Boomerang Weapon as one of the choices
+        if (currentLevel == 3)
+        {
+            bool hasBoomerang = weapons.Exists(w => w is BoomerangWeapon);
+            if (!hasBoomerang)
+            {
+                // First choice: Add Boomerang Weapon
+                currentChoices.Add((null, WeaponUpgrade.UpgradeType.ProjectileCount)); // Special marker for "new weapon"
+                upgradeButtons[0].GetComponentInChildren<Text>().text = "Unlock\n\nBoomerang\nThrows arcing projectiles that hit multiple enemies";
+                
+                // Remaining 2 choices: Upgrade existing weapons
+                for (int i = 1; i < 3; i++)
+                {
+                    AddRandomUpgradeChoice(weapons, i);
+                }
+                
+                DebugLog.Info("[LevelUpUI] Level 3: Guaranteed Boomerang Weapon unlock");
+                return;
+            }
+        }
+        
+        // Level 4: Guarantee Rapid Fire Weapon as one of the choices
+        if (currentLevel == 4)
+        {
+            bool hasRapidFire = weapons.Exists(w => w is RapidFireWeapon);
+            if (!hasRapidFire)
+            {
+                // First choice: Add Rapid Fire Weapon
+                currentChoices.Add((null, WeaponUpgrade.UpgradeType.FireRate)); // Special marker for "new weapon"
+                upgradeButtons[0].GetComponentInChildren<Text>().text = "Unlock\n\nRapid Fire Pistol\nLow damage, HIGH fire rate. Spray and pray!";
+                
+                // Remaining 2 choices: Upgrade existing weapons
+                for (int i = 1; i < 3; i++)
+                {
+                    AddRandomUpgradeChoice(weapons, i);
+                }
+                
+                DebugLog.Info("[LevelUpUI] Level 4: Guaranteed Rapid Fire Weapon unlock");
+                return;
+            }
+        }
+        
         // Normal upgrade choices
         if (weapons.Count == 0)
         {
@@ -211,14 +253,39 @@ public class LevelUpUI : MonoBehaviour
         }
         
         var (weapon, upgradeType) = currentChoices[index];
+        int currentLevel = weaponInventory.GetComponent<Player>().CurrentLevel;
         
-        // Special case: New weapon unlock (weapon is null)
-        if (weapon == null && index == 0) // Level 2 orbiter unlock
+        // Special case: New weapon unlocks
+        if (weapon == null && index == 0)
         {
-            bool success = weaponInventory.AddWeapon("OrbiterWeapon");
-            if (success)
+            bool success = false;
+            
+            // Level 2: Orbiter unlock
+            if (currentLevel == 2)
             {
-                DebugLog.Info("[LevelUpUI] Unlocked Orbiting Blades weapon!");
+                success = weaponInventory.AddWeapon("OrbiterWeapon");
+                if (success)
+                {
+                    DebugLog.Info("[LevelUpUI] Unlocked Orbiting Blades weapon!");
+                }
+            }
+            // Level 3: Boomerang unlock
+            else if (currentLevel == 3)
+            {
+                success = weaponInventory.AddWeapon("BoomerangWeapon");
+                if (success)
+                {
+                    DebugLog.Info("[LevelUpUI] Unlocked Boomerang weapon!");
+                }
+            }
+            // Level 4: Rapid Fire unlock
+            else if (currentLevel == 4)
+            {
+                success = weaponInventory.AddWeapon("RapidFireWeapon");
+                if (success)
+                {
+                    DebugLog.Info("[LevelUpUI] Unlocked Rapid Fire Pistol weapon!");
+                }
             }
         }
         else if (weapon != null)

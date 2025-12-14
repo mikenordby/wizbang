@@ -7,7 +7,7 @@ using System.Collections.Generic;
 public class OrbiterManager : MonoBehaviour
 {
     [SerializeField] private Transform playerTransform;
-    [SerializeField] private int maxOrbiters = 8;
+    private int maxOrbiters = 8; // Not serialized - prevents Inspector override limiting to 2
     [SerializeField] private float orbitSpeed = 1f;
     [SerializeField] private float orbitRadius = 2f;
     [SerializeField] private float damage = 15f;
@@ -33,25 +33,36 @@ public class OrbiterManager : MonoBehaviour
     /// </summary>
     public void SetOrbiterCount(int count)
     {
+        int requestedCount = count;
         count = Mathf.Clamp(count, 0, maxOrbiters);
         
-        if (count == currentOrbiterCount) return;
+        DebugLog.Info($"[OrbiterManager.SetOrbiterCount] CALLED: requested={requestedCount}, clamped={count}, current={currentOrbiterCount}, orbiters.Count={orbiters.Count}");
+        
+        if (count == currentOrbiterCount)
+        {
+            DebugLog.Info($"[OrbiterManager.SetOrbiterCount] No change needed, count={count} already matches");
+            return;
+        }
         
         // Add new orbiters
         while (orbiters.Count < count)
         {
+            DebugLog.Info($"[OrbiterManager.SetOrbiterCount] Creating new orbiter #{orbiters.Count}");
             CreateOrbiter(orbiters.Count);
         }
         
         // Activate/deactivate orbiters
+        int activeCount = 0;
         for (int i = 0; i < orbiters.Count; i++)
         {
             if (i < count)
             {
                 orbiters[i].gameObject.SetActive(true);
+                activeCount++;
                 // Reposition to new spacing
                 float angle = (Mathf.PI * 2f / count) * i;
                 orbiters[i].Initialize(playerTransform, angle, orbitSpeed, orbitRadius);
+                DebugLog.Info($"[OrbiterManager.SetOrbiterCount] Activated orbiter #{i} at angle {angle * Mathf.Rad2Deg}°");
             }
             else
             {
@@ -60,7 +71,7 @@ public class OrbiterManager : MonoBehaviour
         }
         
         currentOrbiterCount = count;
-        DebugLog.Info($"OrbiterManager: Set orbiter count to {count}");
+        DebugLog.Info($"[OrbiterManager.SetOrbiterCount] ✓ COMPLETE: {activeCount} orbiters now active");
     }
     
     /// <summary>
@@ -109,7 +120,7 @@ public class OrbiterManager : MonoBehaviour
         // Create orbiter GameObject
         GameObject orbiterObj = new GameObject($"Orbiter_{index}");
         orbiterObj.transform.parent = transform;
-        orbiterObj.transform.localScale = Vector3.one * 0.3f;
+        orbiterObj.transform.localScale = Vector3.one * 1.5f; // Much larger knives
         
         // Load orbiter sprite
         SpriteRenderer spriteRenderer = orbiterObj.AddComponent<SpriteRenderer>();

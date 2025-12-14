@@ -2,7 +2,7 @@ using UnityEngine;
 
 /// <summary>
 /// Orbiter projectile that circles the player and despawns on enemy contact.
-/// Respawns after a delay.
+/// Respawns after a delay opposite to existing active orbiters.
 /// </summary>
 public class OrbiterProjectile : BaseProjectile, ICollidable
 {
@@ -11,8 +11,11 @@ public class OrbiterProjectile : BaseProjectile, ICollidable
     [SerializeField] private float respawnDelay = 2f;
     
     private Transform playerTransform;
-    private float currentAngle;
+    private OrbiterManager orbiterManager;
     private float respawnTimer;
+    
+    // Public so other orbiters can check our angle for respawn spacing
+    public float currentAngle { get; private set; }
     
     public override float CollisionRadius => 0.35f;
     
@@ -27,6 +30,13 @@ public class OrbiterProjectile : BaseProjectile, ICollidable
         orbitSpeed = speed;
         orbitRadius = radius;
         respawnTimer = 0f;
+        
+        // Get reference to OrbiterManager
+        if (orbiterManager == null)
+        {
+            orbiterManager = GetComponentInParent<OrbiterManager>();
+        }
+        
         Activate();
     }
     
@@ -56,13 +66,67 @@ public class OrbiterProjectile : BaseProjectile, ICollidable
             respawnTimer -= Time.deltaTime;
             if (respawnTimer <= 0f)
             {
+                // Find best respawn angle (opposite to active orbiters)
+                currentAngle = FindBestRespawnAngle();
                 Activate();
-                DebugLog.Info($"[ORBITER] Respawned at angle={currentAngle:F2}, position={transform.position}");
+                DebugLog.Info($"[ORBITER] Respawned at angle={currentAngle:F2} rad ({currentAngle * Mathf.Rad2Deg:F1} deg), position={transform.position}");
             }
             return;
         }
         
         UpdateMovement();
+    }
+    
+    /// <summary>
+    /// Find the best angle to respawn at - opposite to existing active orbiters
+    /// </summary>
+    private float FindBestRespawnAngle()
+    {
+        if (orbiterManager == null)
+        {
+            // Fallback: random angle
+            return Random.Range(0f, Mathf.PI * 2f);
+        }
+        
+        var activeOrbiters = orbiterManager.GetActiveOrbiters();
+        
+        // If no other orbiters or only this one, use random angle
+        if (activeOrbiters == null || activeOrbiters.Count <= 1)
+        {
+            return Random.Range(0f, Mathf.PI * 2f);
+        }
+        
+        // Calculate average angle of all active orbiters (excluding this one)
+        float sumX = 0f;
+        float sumY = 0f;
+        int count = 0;
+        
+        foreach (var orbiter in activeOrbiters)
+        {
+            if (orbiter == null || orbiter == this || !orbiter.IsActive) continue;
+            
+            sumX += Mathf.Cos(orbiter.currentAngle);
+            sumY += Mathf.Sin(orbiter.currentAngle);
+            count++;
+        }
+        
+        if (count == 0)
+        {
+            // No other active orbiters, use random
+            return Random.Range(0f, Mathf.PI * 2f);
+        }
+        
+        // Average angle of active orbiters
+        float avgAngle = Mathf.Atan2(sumY / count, sumX / count);
+        
+        // Spawn opposite (add PI radians = 180 degrees)
+        float oppositeAngle = avgAngle + Mathf.PI;
+        
+        // Normalize to 0-2PI range
+        while (oppositeAngle < 0f) oppositeAngle += Mathf.PI * 2f;
+        while (oppositeAngle >= Mathf.PI * 2f) oppositeAngle -= Mathf.PI * 2f;
+        
+        return oppositeAngle;
     }
     
     protected override void UpdateMovement()

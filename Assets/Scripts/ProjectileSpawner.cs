@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections.Generic;
 
 /// <summary>
 /// Auto-shoots projectiles at nearest enemy
@@ -8,7 +9,7 @@ public class ProjectileSpawner : MonoBehaviour
     [SerializeField] private Transform playerTransform;
     [SerializeField] private ProjectilePool projectilePool;
     [SerializeField] private EnemyPool enemyPool;
-    [SerializeField] private float fireRate = 1f; // 1 per second
+    [SerializeField] private float fireRate = 0.25f; // 4 per second
     
     private float timeSinceLastShot = 0f;
     
@@ -48,8 +49,8 @@ public class ProjectileSpawner : MonoBehaviour
         Enemy nearest = null;
         float nearestDistance = float.MaxValue;
         
-        // Check all enemies (pool will provide active ones through its internal list)
-        Enemy[] allEnemies = enemyPool.GetComponentsInChildren<Enemy>();
+        // Check all enemies (using cached active list)
+        List<Enemy> allEnemies = enemyPool.GetActiveEnemies();
         
         foreach (var enemy in allEnemies)
         {

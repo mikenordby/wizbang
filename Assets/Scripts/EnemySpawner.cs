@@ -7,7 +7,9 @@ using UnityEngine;
 public class EnemySpawner : MonoBehaviour
 {
     [Header("Spawn Settings")]
-    [SerializeField] private float spawnInterval = 0.5f; // 2 per second for visibility
+    [SerializeField] private float baseSpawnInterval = 0.5f; // Starting: 2 per second
+    [SerializeField] private float minSpawnInterval = 0.1f; // Max: 10 per second
+    [SerializeField] private float spawnRateIncreasePerMinute = 0.1f; // Linear scaling
     [SerializeField] private float spawnDistanceFromCamera = 12f; // Just outside view
     
     [Header("References")]
@@ -21,6 +23,8 @@ public class EnemySpawner : MonoBehaviour
     
     private float spawnTimer;
     private float cleanupTimer;
+    private float gameTime; // Track time for spawn rate scaling
+    private float currentSpawnInterval;
     
     private void Start()
     {
@@ -36,10 +40,11 @@ public class EnemySpawner : MonoBehaviour
         }
         else
         {
-            Debug.LogError("EnemySpawner: Missing enemyPool or player reference!");
+            DebugLog.Error("EnemySpawner: Missing enemyPool or player reference!");
         }
         
-        spawnTimer = spawnInterval;
+        currentSpawnInterval = baseSpawnInterval;
+        spawnTimer = currentSpawnInterval;
         cleanupTimer = cleanupInterval;
     }
     
@@ -47,11 +52,16 @@ public class EnemySpawner : MonoBehaviour
     {
         if (enemyPool == null || player == null || GameState.IsPaused) return;
         
+        // Track game time and scale spawn rate (linear increase)
+        gameTime += Time.deltaTime;
+        float minutesElapsed = gameTime / 60f;
+        currentSpawnInterval = Mathf.Max(minSpawnInterval, baseSpawnInterval - (spawnRateIncreasePerMinute * minutesElapsed));
+        
         spawnTimer -= Time.deltaTime;
         if (spawnTimer <= 0f)
         {
             SpawnEnemy();
-            spawnTimer = spawnInterval;
+            spawnTimer = currentSpawnInterval;
         }
         
         cleanupTimer -= Time.deltaTime;
@@ -71,11 +81,11 @@ public class EnemySpawner : MonoBehaviour
         if (enemy != null && stats != null)
         {
             enemy.Activate(spawnPosition, stats);
-            Debug.Log($"Spawned {stats.enemyName} at {spawnPosition}, active: {enemyPool.GetActiveCount()}");
+            DebugLog.Info($"Spawned {stats.enemyName} at {spawnPosition}, active: {enemyPool.GetActiveCount()}");
         }
         else
         {
-            Debug.LogWarning("Failed to spawn enemy - null enemy or stats");
+            DebugLog.Warning("Failed to spawn enemy - null enemy or stats");
         }
     }
     

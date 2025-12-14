@@ -62,19 +62,19 @@ public class XPOrb : MonoBehaviour
         isActive = true;
         gameObject.SetActive(true);
         
-        // Create XP gem sprite if missing
+        // Load XP gem sprite if missing (from Resources or procedural fallback)
         if (spriteRenderer.sprite == null)
         {
-            spriteRenderer.sprite = SpriteGenerator.CreateXPGemSprite();
+            spriteRenderer.sprite = SpriteLoader.LoadXPGemSprite();
         }
         
         if (spriteRenderer != null)
         {
             spriteRenderer.color = Color.white; // Use sprite's own colors
-            transform.localScale = Vector3.one * 0.7f;
+            transform.localScale = Vector3.one * 0.4f; // Smaller XP orbs
         }
         
-        Debug.Log($"XPOrb.Activate: pos={position}, xp={xpAmount}");
+        // XP Orb activated
     }
     
     /// <summary>
@@ -95,7 +95,7 @@ public class XPOrb : MonoBehaviour
             if (player != null)
             {
                 player.AddXP(xpValue);
-                Debug.Log($"XPOrb.Collect: Player collected {xpValue} XP at {transform.position}");
+                DebugLog.Info($"XPOrb.Collect: Player collected {xpValue} XP at {transform.position}");
             }
         }
         

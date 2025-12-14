@@ -1,4 +1,6 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
+using System.Collections.Generic;
 
 /// <summary>
 /// Visualizes collision radii for all game objects with circles.
@@ -7,11 +9,12 @@ using UnityEngine;
 public class CollisionDebugVisualizer : MonoBehaviour
 {
     [SerializeField] private bool showCollisionRadii = true;
-    [SerializeField] private bool showInGameView = true; // Show circles in Game view too
     [SerializeField] private Color playerColor = Color.cyan;
     [SerializeField] private Color enemyColor = Color.red;
     [SerializeField] private Color projectileColor = Color.yellow;
     [SerializeField] private Color orbiterColor = Color.magenta;
+    
+    private Material lineMaterial;
     
     private Transform playerTransform;
     private ProjectilePool projectilePool;
@@ -24,18 +27,50 @@ public class CollisionDebugVisualizer : MonoBehaviour
         if (player != null)
         {
             playerTransform = player.transform;
-            Debug.Log($"[CollisionDebug] Player collision radius: 0.35f");
         }
         
-        projectilePool = FindFirstObjectByType<ProjectilePool>();
-        enemyPool = FindFirstObjectByType<EnemyPool>();
-        orbiterManager = FindFirstObjectByType<OrbiterManager>();
+        projectilePool = GameServices.ProjectilePool;
+        enemyPool = GameServices.EnemyPool;
+        orbiterManager = GameServices.OrbiterManager;
         
-        Debug.Log("[CollisionDebug] Collision radii:");
-        Debug.Log("  - Player: 0.35f");
-        Debug.Log("  - Enemy: 0.35f");
-        Debug.Log("  - Projectile: 0.15f");
-        Debug.Log("  - Orbiter: 0.35f");
+        CreateLineMaterial();
+        
+        DebugLog.Info("[CollisionDebug] Press 0 (zero) to toggle collision visualization");
+    }
+    
+    private void Update()
+    {
+        // Toggle with 0 key
+        if (Keyboard.current != null && Keyboard.current.digit0Key.wasPressedThisFrame)
+        {
+            showCollisionRadii = !showCollisionRadii;
+            string status = showCollisionRadii ? "ON" : "OFF";
+            DebugLog.Info($"[CollisionDebug] Collision visualization: {status}");
+            DebugLog.Info($"[CollisionDebug] Attached to: {gameObject.name}, Camera.main: {Camera.main != null}, Material: {lineMaterial != null}");
+            
+            // Count entities for debugging
+            int playerCount = playerTransform != null ? 1 : 0;
+            int enemyCount = enemyPool != null ? enemyPool.GetActiveEnemies().Count : 0;
+            int projectileCount = projectilePool != null ? projectilePool.GetActiveProjectiles().Count : 0;
+            DebugLog.Info($"[CollisionDebug] Entities to draw: Player={playerCount}, Enemies={enemyCount}, Projectiles={projectileCount}");
+        }
+    }
+    
+    private void CreateLineMaterial()
+    {
+        if (lineMaterial == null)
+        {
+            // Create a simple unlit material for GL.Lines
+            Shader shader = Shader.Find("Hidden/Internal-Colored");
+            lineMaterial = new Material(shader);
+            lineMaterial.hideFlags = HideFlags.HideAndDontSave;
+            lineMaterial.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+            lineMaterial.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+            lineMaterial.SetInt("_Cull", (int)UnityEngine.Rendering.CullMode.Off);
+            lineMaterial.SetInt("_ZWrite", 0);
+            lineMaterial.SetInt("_ZTest", (int)UnityEngine.Rendering.CompareFunction.Always);
+            DebugLog.Info("[CollisionDebug] Created line material");
+        }
     }
     
     private void OnDrawGizmos()
@@ -57,7 +92,7 @@ public class CollisionDebugVisualizer : MonoBehaviour
         // Draw enemy collision radii
         if (enemyPool != null)
         {
-            Enemy[] enemies = enemyPool.GetComponentsInChildren<Enemy>();
+            List<Enemy> enemies = enemyPool.GetActiveEnemies();
             foreach (var enemy in enemies)
             {
                 if (enemy != null && enemy.gameObject.activeInHierarchy && enemy.IsActive)
@@ -71,7 +106,7 @@ public class CollisionDebugVisualizer : MonoBehaviour
         // Draw projectile collision radii
         if (projectilePool != null)
         {
-            Projectile[] projectiles = projectilePool.GetComponentsInChildren<Projectile>();
+            List<Projectile> projectiles = projectilePool.GetActiveProjectiles();
             foreach (var projectile in projectiles)
             {
                 if (projectile != null && projectile.IsActive)
@@ -100,46 +135,62 @@ public class CollisionDebugVisualizer : MonoBehaviour
         }
     }
     
-    void OnGUI()
+    private void OnRenderObject()
     {
-        if (!showInGameView || !showCollisionRadii) return;
-
+        // Always show hitboxes during gameplay (not just when paused)
+        if (!showCollisionRadii || lineMaterial == null) return;
+        
+        // Get the main camera
         Camera cam = Camera.main;
         if (cam == null) return;
-
-        // Draw player hitbox circle
+        
+        int entityCount = 0;
+        if (playerTransform != null) entityCount++;
+        if (enemyPool != null) entityCount += enemyPool.GetActiveEnemies().Count;
+        if (projectilePool != null) entityCount += projectilePool.GetActiveProjectiles().Count;
+        
+        if (entityCount == 0) return;
+        
+        lineMaterial.SetPass(0);
+        GL.PushMatrix();
+        GL.LoadProjectionMatrix(cam.projectionMatrix);
+        GL.modelview = cam.worldToCameraMatrix;
+        
+        GL.Begin(GL.LINES);
+        
+        // Draw player collision circle
         if (playerTransform != null)
         {
-            DrawCircleOnScreen(cam, playerTransform.position, 0.35f, playerColor);
+            DrawCircleGL(playerTransform.position, 0.35f, playerColor);
         }
-
-        // Draw enemy hitbox circles
+        
+        // Draw enemy collision circles
         if (enemyPool != null)
         {
-            Enemy[] enemies = enemyPool.GetComponentsInChildren<Enemy>();
+            List<Enemy> enemies = enemyPool.GetActiveEnemies();
             foreach (var enemy in enemies)
             {
                 if (enemy != null && enemy.gameObject.activeInHierarchy && enemy.IsActive)
                 {
-                    DrawCircleOnScreen(cam, enemy.transform.position, 0.35f, enemyColor);
+                    DrawCircleGL(enemy.transform.position, 0.35f, enemyColor);
                 }
             }
         }
-
-        // Draw projectile hitbox circles
+        
+        // Draw projectile collision circles
         if (projectilePool != null)
         {
-            Projectile[] projectiles = projectilePool.GetComponentsInChildren<Projectile>();
+            List<Projectile> projectiles = projectilePool.GetActiveProjectiles();
             foreach (var projectile in projectiles)
             {
                 if (projectile != null && projectile.IsActive)
                 {
-                    DrawCircleOnScreen(cam, projectile.transform.position, 0.15f, projectileColor);
+                    DrawCircleGL(projectile.transform.position, 0.15f, projectileColor);
                 }
             }
         }
-
-        // Draw orbiter hitbox circles
+        
+        // Draw orbiter collision circles
         if (orbiterManager != null)
         {
             var orbiters = orbiterManager.GetActiveOrbiters();
@@ -149,61 +200,31 @@ public class CollisionDebugVisualizer : MonoBehaviour
                 {
                     if (orbiter != null && orbiter.IsActive)
                     {
-                        DrawCircleOnScreen(cam, orbiter.transform.position, 0.35f, orbiterColor);
+                        DrawCircleGL(orbiter.transform.position, 0.35f, orbiterColor);
                     }
                 }
             }
         }
+        
+        GL.End();
+        GL.PopMatrix();
     }
-
-    private void DrawCircleOnScreen(Camera cam, Vector3 worldPos, float radius, Color color)
+    
+    private void DrawCircleGL(Vector3 center, float radius, Color color)
     {
-        Vector3 screenPos = cam.WorldToScreenPoint(worldPos);
-        if (screenPos.z < 0) return; // Behind camera
-
-        // Convert world radius to screen pixels
-        Vector3 worldRight = worldPos + Vector3.right * radius;
-        Vector3 screenRight = cam.WorldToScreenPoint(worldRight);
-        float screenRadius = Vector2.Distance(screenPos, screenRight);
-
-        // Draw circle using line segments
+        GL.Color(color);
+        
         int segments = 32;
-        Color guiColor = GUI.color;
-        GUI.color = color;
-
         for (int i = 0; i < segments; i++)
         {
             float angle1 = (i / (float)segments) * Mathf.PI * 2f;
             float angle2 = ((i + 1) / (float)segments) * Mathf.PI * 2f;
-
-            Vector2 p1 = new Vector2(
-                screenPos.x + Mathf.Cos(angle1) * screenRadius,
-                Screen.height - (screenPos.y + Mathf.Sin(angle1) * screenRadius)
-            );
-            Vector2 p2 = new Vector2(
-                screenPos.x + Mathf.Cos(angle2) * screenRadius,
-                Screen.height - (screenPos.y + Mathf.Sin(angle2) * screenRadius)
-            );
-
-            DrawLine(p1, p2, color);
+            
+            Vector3 p1 = center + new Vector3(Mathf.Cos(angle1) * radius, Mathf.Sin(angle1) * radius, 0f);
+            Vector3 p2 = center + new Vector3(Mathf.Cos(angle2) * radius, Mathf.Sin(angle2) * radius, 0f);
+            
+            GL.Vertex3(p1.x, p1.y, p1.z);
+            GL.Vertex3(p2.x, p2.y, p2.z);
         }
-
-        GUI.color = guiColor;
-    }
-
-    private void DrawLine(Vector2 p1, Vector2 p2, Color color)
-    {
-        // Draw a line using GUI texture
-        Vector2 dir = p2 - p1;
-        float angle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
-        float distance = dir.magnitude;
-
-        Matrix4x4 matrix = GUI.matrix;
-        GUIUtility.RotateAroundPivot(angle, p1);
-
-        GUI.color = color;
-        GUI.DrawTexture(new Rect(p1.x, p1.y, distance, 2f), Texture2D.whiteTexture);
-
-        GUI.matrix = matrix;
     }
 }

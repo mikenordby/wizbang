@@ -5,28 +5,20 @@ using System.Collections.Generic;
 /// Object pool for enemies to avoid instantiate/destroy overhead.
 /// Supports multiple enemy types via EnemyStats.
 /// </summary>
-public class EnemyPool : MonoBehaviour
+public class EnemyPool : ObjectPool<Enemy>
 {
     [SerializeField] private GameObject enemyPrefab;
-    [SerializeField] private int initialPoolSize = 100;
-    [SerializeField] private int maxPoolSize = 500;
     [SerializeField] private Transform poolParent;
     [SerializeField] private EnemyStats[] enemyTypes; // Array of enemy types
     
-    private List<Enemy> pool;
     private Transform playerTransform;
     
-    private void Awake()
+    protected override void Awake()
     {
         if (poolParent == null)
             poolParent = transform;
         
-        pool = new List<Enemy>(maxPoolSize);
-        
-        for (int i = 0; i < initialPoolSize; i++)
-        {
-            CreateNewEnemy();
-        }
+        base.Awake();
     }
     
     public void SetPlayer(Transform player)
@@ -39,56 +31,45 @@ public class EnemyPool : MonoBehaviour
     /// </summary>
     public Enemy GetEnemy(EnemyStats stats)
     {
-        foreach (Enemy enemy in pool)
+        Enemy enemy = GetItem();
+        
+        if (enemy != null)
         {
-            if (!enemy.IsActive)
-            {
-                // Ensure player reference is set before activation
-                if (playerTransform != null)
-                    enemy.SetPlayerTransform(playerTransform);
-                Debug.Log($"EnemyPool.GetEnemy: Reusing pooled enemy, active={GetActiveCount()}/{pool.Count}");
-                return enemy;
-            }
+            // Ensure player reference is set before activation
+            if (playerTransform != null)
+                enemy.SetPlayerTransform(playerTransform);
         }
         
-        if (pool.Count < maxPoolSize)
-        {
-            Debug.Log($"EnemyPool.GetEnemy: Creating new enemy, pool={pool.Count}/{maxPoolSize}");
-            return CreateNewEnemy();
-        }
-        
-        Debug.LogWarning("Enemy pool exhausted, reusing enemy");
-        return pool[0];
+        return enemy;
     }
     
     public void ReturnEnemy(Enemy enemy)
     {
-        enemy.Deactivate();
+        ReturnItem(enemy);
+        // NOTE: Don't call enemy.Deactivate() here - it creates infinite recursion
+        // Deactivate() already calls ReturnEnemy() as a failsafe
     }
     
-    public int GetActiveCount()
-    {
-        int count = 0;
-        foreach (Enemy enemy in pool)
-        {
-            if (enemy.IsActive) count++;
-        }
-        return count;
-    }
+    /// <summary>
+    /// Get cached list of active enemies (no GC allocations)
+    /// </summary>
+    public List<Enemy> GetActiveEnemies() => activeItems;
     
     public void CleanupDistantEnemies(float maxDistance)
     {
         int cleanedCount = 0;
-        foreach (Enemy enemy in pool)
+        // Iterate backwards to safely remove during iteration
+        for (int i = activeItems.Count - 1; i >= 0; i--)
         {
-            if (enemy.IsActive && enemy.IsTooFarFromPlayer(maxDistance))
+            Enemy enemy = activeItems[i];
+            if (enemy.IsTooFarFromPlayer(maxDistance))
             {
-                enemy.Deactivate();
+                ReturnEnemy(enemy); // This removes from activeItems list
                 cleanedCount++;
             }
         }
         if (cleanedCount > 0)
-            Debug.Log($"EnemyPool.Cleanup: Deactivated {cleanedCount} distant enemies, active={GetActiveCount()}");
+            DebugLog.Info($"EnemyPool.Cleanup: Deactivated {cleanedCount} distant enemies, active={activeItems.Count}");
     }
     
     /// <summary>
@@ -98,21 +79,21 @@ public class EnemyPool : MonoBehaviour
     {
         if (enemyTypes == null || enemyTypes.Length == 0)
         {
-            Debug.LogError("No enemy types configured!");
+            DebugLog.Error("No enemy types configured!");
             return null;
         }
         
         return enemyTypes[Random.Range(0, enemyTypes.Length)];
     }
     
-    private Enemy CreateNewEnemy()
+    protected override Enemy CreateNewItem()
     {
         GameObject enemyObj = Instantiate(enemyPrefab, poolParent);
         Enemy enemy = enemyObj.GetComponent<Enemy>();
         
         if (enemy == null)
         {
-            Debug.LogError("Enemy prefab must have Enemy component!");
+            DebugLog.Error("Enemy prefab must have Enemy component!");
             return null;
         }
         
@@ -122,6 +103,15 @@ public class EnemyPool : MonoBehaviour
         enemy.Deactivate();
         pool.Add(enemy);
         
+        // Add to active list if item is being created during GetItem()
+        if (!activeItems.Contains(enemy))
+            activeItems.Add(enemy);
+        
         return enemy;
+    }
+    
+    protected override bool IsActive(Enemy item)
+    {
+        return item.IsActive;
     }
 }

@@ -4,7 +4,7 @@ using UnityEngine;
 /// Straight-line projectile that moves in a single direction.
 /// Highly performant - uses transform instead of physics.
 /// </summary>
-public class Projectile : BaseProjectile
+public class Projectile : BaseProjectile, ICollidable
 {
     [SerializeField] private float baseSpeed = 8f;
     [SerializeField] private float lifetime = 10f;
@@ -14,6 +14,10 @@ public class Projectile : BaseProjectile
     private float lifetimeRemaining;
     
     public override float CollisionRadius => 0.15f; // Smaller collision for straight projectiles
+    
+    // ICollidable implementation
+    public Vector3 Position => transform.position;
+    public CollisionLayer Layer => CollisionLayer.Projectile;
     
     /// <summary>
     /// Activate projectile with straight movement
@@ -25,9 +29,13 @@ public class Projectile : BaseProjectile
         speed = baseSpeed;
         lifetimeRemaining = lifetime;
         
+        // Rotate sprite to face movement direction (so flame tail trails behind)
+        float angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
+        transform.rotation = Quaternion.Euler(0, 0, angle);
+        
         Activate(); // Call base activation
         
-        Debug.Log($"Projectile.Activate: pos={startPos}, dir={direction}, speed={speed}");
+        DebugLog.Verbose($"[Projectile] ActivateStraight: pos=({startPos.x:F2},{startPos.y:F2}) dir=({direction.x:F2},{direction.y:F2}) damage={Damage:F1} pierce={Pierce}");
     }
     
     protected override void UpdateMovement()

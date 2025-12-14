@@ -3,7 +3,7 @@ using UnityEngine;
 /// <summary>
 /// Player character stats, progression, and state management
 /// </summary>
-public class Player : MonoBehaviour
+public class Player : MonoBehaviour, ICollidable
 {
     [Header("Level & XP")]
     [SerializeField] private int currentLevel = 1;
@@ -49,6 +49,12 @@ public class Player : MonoBehaviour
     
     [Tooltip("Luck stat (affects drop rates, crits, etc)")]
     [SerializeField] private float luck = 0f;
+    
+    // ICollidable implementation
+    public Vector3 Position => transform.position;
+    public float CollisionRadius => 0.35f;
+    public bool IsActive => true; // Player always active
+    public CollisionLayer Layer => CollisionLayer.Player;
     
     [Header("Weapon Stats")]
     [Tooltip("Max weapon slots available")]
@@ -105,15 +111,32 @@ public class Player : MonoBehaviour
     void Start()
     {
         CalculateXPToNextLevel();
-        levelUpUI = FindAnyObjectByType<LevelUpUI>();
+        levelUpUI = GameServices.LevelUpUI;
         
-        // Create wizard sprite
+        // Load wizard sprite (from Resources or procedural fallback)
         SpriteRenderer sr = GetComponent<SpriteRenderer>();
         if (sr == null)
             sr = gameObject.AddComponent<SpriteRenderer>();
-        sr.sprite = SpriteGenerator.CreateWizardSprite();
         
-        Debug.Log($"Player.Start: Level {currentLevel}, XP {currentXP}/{xpToNextLevel}");
+        Sprite oldSprite = sr.sprite;
+        sr.sprite = SpriteLoader.LoadWizardSprite();
+        
+        if (sr.sprite != null)
+        {
+            DebugLog.Info($"Player.Start: Sprite set - Size: {sr.sprite.texture.width}x{sr.sprite.texture.height}px, PPU: {sr.sprite.pixelsPerUnit}, Scale: {transform.localScale}");
+            DebugLog.Info($"Player.Start: SpriteRenderer bounds: {sr.bounds.size}, Sprite rect: {sr.sprite.rect}");
+        }
+        else
+        {
+            DebugLog.Error("Player.Start: Failed to load wizard sprite!");
+        }
+        
+        if (oldSprite != null && oldSprite != sr.sprite)
+        {
+            DebugLog.Warning($"Player.Start: Sprite was replaced (old: {oldSprite.texture.width}x{oldSprite.texture.height}px)");
+        }
+        
+        DebugLog.Info($"Player.Start: Level {currentLevel}, XP {currentXP}/{xpToNextLevel}");
     }
     
     /// <summary>
@@ -122,7 +145,7 @@ public class Player : MonoBehaviour
     public void AddXP(int amount)
     {
         currentXP += amount;
-        Debug.Log($"Player.AddXP: Gained {amount} XP, total={currentXP}/{xpToNextLevel}");
+        DebugLog.Info($"Player.AddXP: Gained {amount} XP, total={currentXP}/{xpToNextLevel}");
         
         // Check for level up
         while (currentXP >= xpToNextLevel)
@@ -140,7 +163,7 @@ public class Player : MonoBehaviour
         currentXP -= xpToNextLevel;
         CalculateXPToNextLevel();
         
-        Debug.Log($"Player.LevelUp: LEVEL UP! Now level {currentLevel}, XP={currentXP}/{xpToNextLevel}");
+        DebugLog.Info($"Player.LevelUp: LEVEL UP! Now level {currentLevel}, XP={currentXP}/{xpToNextLevel}");
         
         if (levelUpUI != null)
         {
@@ -149,11 +172,13 @@ public class Player : MonoBehaviour
     }
     
     /// <summary>
-    /// Calculate XP needed for next level using formula: 5 * level
+    /// Calculate XP needed for next level using formula: 3 * level (easy leveling for testing)
+    /// Level 2=3, Level 3=6, Level 4=9, Level 5=12, etc.
     /// </summary>
     private void CalculateXPToNextLevel()
     {
-        xpToNextLevel = 5 * currentLevel;
+        xpToNextLevel = 3 * currentLevel;
+        DebugLog.Info($"Player.CalculateXP: Level {currentLevel} requires {xpToNextLevel} XP for next level");
     }
     
     /// <summary>
@@ -217,10 +242,10 @@ public class Player : MonoBehaviour
                 rangeMultiplier = isMultiplier ? rangeMultiplier * value : rangeMultiplier + value;
                 break;
             default:
-                Debug.LogWarning($"Player.ModifyStat: Unknown stat '{statName}'");
+                DebugLog.Warning($"Player.ModifyStat: Unknown stat '{statName}'");
                 break;
         }
         
-        Debug.Log($"Player.ModifyStat: {statName} modified by {value} ({(isMultiplier ? "multiply" : "add")})");
+        DebugLog.Info($"Player.ModifyStat: {statName} modified by {value} ({(isMultiplier ? "multiply" : "add")})");
     }
 }

@@ -10,15 +10,43 @@ public abstract class BaseProjectile : MonoBehaviour
     
     protected bool isActive;
     protected SpriteRenderer spriteRenderer;
+    protected float damage;
+    protected int pierce;
+    protected int enemiesHit;
     
     public bool IsActive => isActive;
     public virtual float CollisionRadius => collisionRadius;
+    public float Damage => damage;
+    public int Pierce => pierce;
+    public int EnemiesHit => enemiesHit;
     
     protected virtual void Awake()
     {
         spriteRenderer = GetComponent<SpriteRenderer>();
         if (spriteRenderer == null)
             spriteRenderer = gameObject.AddComponent<SpriteRenderer>();
+    }
+    
+    /// <summary>
+    /// Set projectile stats (damage and pierce)
+    /// </summary>
+    public virtual void SetStats(float damageValue, int pierceValue)
+    {
+        damage = damageValue;
+        pierce = pierceValue;
+        enemiesHit = 0;
+        DebugLog.Verbose($"[BaseProjectile] SetStats: damage={damage:F1}, pierce={pierce}, enemiesHit reset to 0");
+    }
+    
+    /// <summary>
+    /// Increment hit counter, returns true if projectile should be deactivated
+    /// </summary>
+    public bool RegisterHit()
+    {
+        enemiesHit++;
+        bool shouldDeactivate = enemiesHit > pierce; // Deactivate if hit more enemies than pierce allows
+        DebugLog.Verbose($"[BaseProjectile] RegisterHit: enemiesHit={enemiesHit}, pierce={pierce}, shouldDeactivate={shouldDeactivate}");
+        return shouldDeactivate;
     }
     
     /// <summary>
@@ -34,6 +62,7 @@ public abstract class BaseProjectile : MonoBehaviour
     
     /// <summary>
     /// Deactivate the projectile and return to pool or respawn state
+    /// NOTE: Does NOT reset damage/pierce - those are set when projectile is reused
     /// </summary>
     public virtual void Deactivate()
     {
@@ -41,6 +70,16 @@ public abstract class BaseProjectile : MonoBehaviour
         gameObject.SetActive(false);
         if (spriteRenderer != null)
             spriteRenderer.enabled = false;
+        
+        DebugLog.Verbose($"[BaseProjectile] Deactivated - damage={damage:F1} pierce={pierce} enemiesHit={enemiesHit} (stats preserved for pool reuse)");
+        
+        // Notify pool to remove from active list (only for Projectile, not OrbiterProjectile)
+        if (this is Projectile)
+        {
+            ProjectilePool pool = GetComponentInParent<ProjectilePool>();
+            if (pool != null)
+                pool.ReturnProjectile(this as Projectile);
+        }
     }
     
     /// <summary>

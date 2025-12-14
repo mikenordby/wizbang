@@ -46,13 +46,16 @@ public class Health : MonoBehaviour, IDamageable
     {
         // Check i-frames
         if (iFrameTimer > 0f)
+        {
+            DebugLog.Info($"[Health.TakeDamage] {gameObject.name} has i-frames! Remaining={iFrameTimer:F2}s, damage blocked");
             return false;
+        }
         
         // Apply damage
         currentHealth -= damage;
         currentHealth = Mathf.Max(0f, currentHealth);
         
-        Debug.Log($"Health.TakeDamage: {gameObject.name} took {damage} damage, HP: {currentHealth}/{maxHealth}");
+        DebugLog.Info($"[Health.TakeDamage] {gameObject.name} took {damage:F1} damage, HP: {currentHealth:F1}/{maxHealth:F1}");
         
         OnHealthChanged?.Invoke(currentHealth);
         
@@ -65,7 +68,7 @@ public class Health : MonoBehaviour, IDamageable
         // Check death
         if (currentHealth <= 0f)
         {
-            Debug.Log($"Health.TakeDamage: {gameObject.name} DIED! Invoking OnDeath event");
+            DebugLog.Info($"[Health.TakeDamage] {gameObject.name} DIED! HP=0 Invoking OnDeath event (listeners={OnDeath?.GetInvocationList().Length ?? 0})");
             OnDeath?.Invoke();
             return true; // Entity died
         }

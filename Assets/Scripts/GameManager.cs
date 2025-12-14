@@ -2,19 +2,27 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 
 /// <summary>
-/// Handles game restart functionality
+/// Handles game restart functionality and main menu
 /// </summary>
 public class GameManager : MonoBehaviour
 {
     private CollisionManager collisionManager;
-    private CollisionDebugVisualizer debugVisualizer;
+    private MainMenuUI mainMenu;
     
     private void Start()
     {
         collisionManager = GetComponent<CollisionManager>();
         
-        // Add debug visualizer
-        debugVisualizer = gameObject.AddComponent<CollisionDebugVisualizer>();
+        // Create main menu on game start
+        GameObject menuObj = new GameObject("MainMenu");
+        mainMenu = menuObj.AddComponent<MainMenuUI>();
+        
+        // Add debug visualizer to Main Camera for OnRenderObject to work
+        Camera mainCam = Camera.main;
+        if (mainCam != null && mainCam.GetComponent<CollisionDebugVisualizer>() == null)
+        {
+            mainCam.gameObject.AddComponent<CollisionDebugVisualizer>();
+        }
     }
     
     private void Update()

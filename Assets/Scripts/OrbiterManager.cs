@@ -7,9 +7,15 @@ using System.Collections.Generic;
 public class OrbiterManager : MonoBehaviour
 {
     [SerializeField] private Transform playerTransform;
-    [SerializeField] private int maxOrbiters = 2;
+    [SerializeField] private int maxOrbiters = 8;
+    [SerializeField] private float orbitSpeed = 1f;
+    [SerializeField] private float orbitRadius = 2f;
+    [SerializeField] private float damage = 15f;
     
     private List<OrbiterProjectile> orbiters;
+    private List<OrbiterProjectile> cachedActiveOrbiters = new List<OrbiterProjectile>();
+    private int lastCacheFrame = -1;
+    private int currentOrbiterCount = 0;
     
     private void Start()
     {
@@ -18,13 +24,82 @@ public class OrbiterManager : MonoBehaviour
         
         orbiters = new List<OrbiterProjectile>();
         
-        // Create orbiters evenly spaced
-        for (int i = 0; i < maxOrbiters; i++)
+        // Don't create orbiters by default - let OrbiterWeapon control this
+        DebugLog.Info($"OrbiterManager: Initialized (waiting for weapon activation)");
+    }
+    
+    /// <summary>
+    /// Set number of active orbiters
+    /// </summary>
+    public void SetOrbiterCount(int count)
+    {
+        count = Mathf.Clamp(count, 0, maxOrbiters);
+        
+        if (count == currentOrbiterCount) return;
+        
+        // Add new orbiters
+        while (orbiters.Count < count)
         {
-            CreateOrbiter(i);
+            CreateOrbiter(orbiters.Count);
         }
         
-        Debug.Log($"OrbiterManager: Created {maxOrbiters} orbiters");
+        // Activate/deactivate orbiters
+        for (int i = 0; i < orbiters.Count; i++)
+        {
+            if (i < count)
+            {
+                orbiters[i].gameObject.SetActive(true);
+                // Reposition to new spacing
+                float angle = (Mathf.PI * 2f / count) * i;
+                orbiters[i].Initialize(playerTransform, angle, orbitSpeed, orbitRadius);
+            }
+            else
+            {
+                orbiters[i].gameObject.SetActive(false);
+            }
+        }
+        
+        currentOrbiterCount = count;
+        DebugLog.Info($"OrbiterManager: Set orbiter count to {count}");
+    }
+    
+    /// <summary>
+    /// Set orbiter damage
+    /// </summary>
+    public void SetDamage(float newDamage)
+    {
+        damage = newDamage;
+        foreach (var orbiter in orbiters)
+        {
+            if (orbiter != null)
+                orbiter.SetDamage(damage);
+        }
+    }
+    
+    /// <summary>
+    /// Set orbit speed multiplier
+    /// </summary>
+    public void SetOrbitSpeed(float speed)
+    {
+        orbitSpeed = speed;
+        foreach (var orbiter in orbiters)
+        {
+            if (orbiter != null)
+                orbiter.SetOrbitSpeed(orbitSpeed);
+        }
+    }
+    
+    /// <summary>
+    /// Set orbit radius
+    /// </summary>
+    public void SetOrbitRadius(float radius)
+    {
+        orbitRadius = radius;
+        foreach (var orbiter in orbiters)
+        {
+            if (orbiter != null)
+                orbiter.SetOrbitRadius(orbitRadius);
+        }
     }
     
     private void CreateOrbiter(int index)
@@ -36,27 +111,43 @@ public class OrbiterManager : MonoBehaviour
         orbiterObj.transform.parent = transform;
         orbiterObj.transform.localScale = Vector3.one * 0.3f;
         
-        // Add sprite renderer with orbiter sprite
+        // Load orbiter sprite
         SpriteRenderer spriteRenderer = orbiterObj.AddComponent<SpriteRenderer>();
-        spriteRenderer.sprite = SpriteGenerator.CreateOrbiterSprite();
+        spriteRenderer.sprite = SpriteLoader.LoadOrbiterSprite();
         
-        // Add CircleCollider2D for collision detection
+        // Add CircleCollider2D
         CircleCollider2D collider = orbiterObj.AddComponent<CircleCollider2D>();
         collider.radius = 0.35f;
-        collider.isTrigger = true; // Use trigger for projectile-like behavior
+        collider.isTrigger = true;
         
         // Add orbiter component
         OrbiterProjectile orbiter = orbiterObj.AddComponent<OrbiterProjectile>();
         
-        // Space orbiters evenly around circle
-        float startAngle = (Mathf.PI * 2f / maxOrbiters) * index;
-        orbiter.Initialize(playerTransform, startAngle);
+        // Initialize (will be repositioned when SetOrbiterCount is called)
+        float startAngle = 0f;
+        orbiter.Initialize(playerTransform, startAngle, orbitSpeed, orbitRadius);
+        orbiter.SetDamage(damage);
         
+        orbiterObj.SetActive(false); // Start inactive
         orbiters.Add(orbiter);
     }
     
+    /// <summary>
+    /// Get active orbiters with frame-based caching (no GC per frame)
+    /// </summary>
     public List<OrbiterProjectile> GetActiveOrbiters()
     {
-        return orbiters.FindAll(o => o.IsActive);
+        // Cache active list per frame (orbiters queried multiple times per frame)
+        if (Time.frameCount != lastCacheFrame)
+        {
+            cachedActiveOrbiters.Clear();
+            foreach (var orbiter in orbiters)
+            {
+                if (orbiter != null && orbiter.IsActive)
+                    cachedActiveOrbiters.Add(orbiter);
+            }
+            lastCacheFrame = Time.frameCount;
+        }
+        return cachedActiveOrbiters;
     }
 }

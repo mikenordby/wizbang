@@ -2,8 +2,9 @@ using UnityEngine;
 using System.Collections.Generic;
 
 /// <summary>
-/// Efficient collision detection manager using distance checks.
+/// Efficient collision detection manager using spatial hash grid.
 /// Handles projectile-enemy and player-enemy collisions.
+/// Uses spatial partitioning to reduce O(n²) checks to O(n).
 /// </summary>
 public class CollisionManager : MonoBehaviour
 {
@@ -14,28 +15,40 @@ public class CollisionManager : MonoBehaviour
     [SerializeField] private float playerCollisionRadius = 0.35f;
     [SerializeField] private float projectileDamage = 100f; // 1-hit kill for all enemies
     
+    [Header("Spatial Hash Grid Settings")]
+    [Tooltip("Cell size for spatial partitioning (should be ~2x max collision radius)")]
+    [SerializeField] private float gridCellSize = 2.0f;
+    
+    [Tooltip("Show grid debug info in Scene view")]
+    [SerializeField] private bool showGridDebug = false;
+    
     private float lastPlayerDamageTime = -999f;
     private float playerDamageCooldown = 0.5f;
     
     private bool gameOver = false;
     private Health playerHealth;
+    private SpatialHashGrid spatialGrid;
 
     
     public bool IsGameOver => gameOver;
     
     private void Start()
     {
+        // Initialize spatial hash grid
+        spatialGrid = new SpatialHashGrid(gridCellSize);
+        DebugLog.Info($"[CollisionManager] Initialized spatial hash grid with cell size {gridCellSize}");
+        
         // Auto-find OrbiterManager if not assigned
         if (orbiterManager == null)
         {
             orbiterManager = GetComponent<OrbiterManager>();
             if (orbiterManager != null)
             {
-                Debug.Log("[CollisionManager] Auto-found OrbiterManager on same GameObject");
+                DebugLog.Info("[CollisionManager] Auto-found OrbiterManager on same GameObject");
             }
         }
         
-        Debug.Log($"[CollisionManager] Starting - orbiterManager={orbiterManager != null}, enemyPool={enemyPool != null}, projectilePool={projectilePool != null}");
+        DebugLog.Info($"[CollisionManager] Starting - orbiterManager={orbiterManager != null}, enemyPool={enemyPool != null}, projectilePool={projectilePool != null}");
         
         if (playerTransform != null)
         {
@@ -72,165 +85,227 @@ public class CollisionManager : MonoBehaviour
     {
         if (gameOver || GameState.IsPaused) return;
         
+        // Populate spatial hash grid with all entities
+        PopulateSpatialGrid();
+        
+        // Perform collision checks using grid
         CheckProjectileEnemyCollisions();
         CheckOrbiterEnemyCollisions();
         CheckPlayerEnemyCollisions();
     }
     
     /// <summary>
-    /// Check all active projectiles against all active enemies
+    /// Populate spatial hash grid with all collidable entities
     /// </summary>
-private void CheckProjectileEnemyCollisions()
+    private void PopulateSpatialGrid()
+    {
+        spatialGrid.Clear();
+        
+        // Insert all enemies (using cached active list - no GC)
+        if (enemyPool != null)
+        {
+            List<Enemy> activeEnemies = enemyPool.GetActiveEnemies();
+            foreach (var enemy in activeEnemies)
+            {
+                if (enemy != null && enemy.gameObject.activeInHierarchy && enemy.IsActive)
+                {
+                    spatialGrid.Insert(enemy);
+                }
+            }
+        }
+        
+        // Note: We don't insert projectiles/orbiters into grid because they query enemies
+        // Only enemies need to be in the grid for efficient nearest-neighbor queries
+    }
+    
+    /// <summary>
+    /// Check all active projectiles against nearby enemies using spatial hash grid
+    /// </summary>
+    private void CheckProjectileEnemyCollisions()
     {
         if (projectilePool == null || enemyPool == null) return;
         
-        List<Projectile> activeProjectiles = projectilePool.GetActiveProjectiles();
-        Enemy[] allEnemies = enemyPool.GetComponentsInChildren<Enemy>();
+        // Create a copy to avoid collection modified exception when Deactivate() removes from list
+        List<Projectile> activeProjectiles = new List<Projectile>(projectilePool.GetActiveProjectiles());
         
         foreach (var projectile in activeProjectiles)
         {
-            if (!projectile.IsActive) continue;
-            
-            foreach (var enemy in allEnemies)
+            if (!projectile.IsActive)
             {
-                if (!enemy.gameObject.activeInHierarchy) continue;
-                
-                float distance = Vector3.Distance(projectile.transform.position, enemy.transform.position);
-                float combinedRadius = projectile.CollisionRadius + enemy.CollisionRadius;
-                
-                if (distance < combinedRadius)
+                DebugLog.Verbose($"[CheckProjectileCollisions] Skipping inactive projectile");
+                continue;
+            }
+            
+            DebugLog.Verbose($"[CheckProjectileCollisions] Checking projectile at ({projectile.Position.x:F2},{projectile.Position.y:F2}) damage={projectile.Damage:F1} pierce={projectile.Pierce} hits={projectile.EnemiesHit}");
+            
+            // Query spatial grid for nearby enemies
+            var nearbyEntities = spatialGrid.Query(
+                projectile.Position, 
+                projectile.CollisionRadius, 
+                CollisionLayer.Enemy
+            );
+            
+            foreach (var entity in nearbyEntities)
+            {
+                if (entity is Enemy enemy && enemy.gameObject.activeInHierarchy)
                 {
-                    Health enemyHealth = enemy.GetComponent<Health>();
-                    if (enemyHealth != null)
-                    {
-                        enemyHealth.TakeDamage(projectileDamage);
-                        Debug.Log($"Collision: Projectile hit enemy at {enemy.transform.position}, distance={distance:F2}");
-                    }
+                    float distance = Vector3.Distance(projectile.Position, enemy.Position);
+                    float combinedRadius = projectile.CollisionRadius + enemy.CollisionRadius;
                     
-                    projectile.Deactivate();
-                    break;
+                    DebugLog.Verbose($"[CheckProjectileCollisions] Distance to {enemy.name}: {distance:F3} vs combinedRadius: {combinedRadius:F3}");
+                    
+                    if (distance < combinedRadius)
+                    {
+                        Health enemyHealth = enemy.GetComponent<Health>();
+                        if (enemyHealth != null)
+                        {
+                            float healthBefore = enemyHealth.CurrentHealth;
+                            bool died = enemyHealth.TakeDamage(projectile.Damage);
+                            float healthAfter = enemyHealth.CurrentHealth;
+                            
+                            DebugLog.Info($"[PROJECTILE HIT] {enemy.name} - Damage={projectile.Damage:F1} HP: {healthBefore:F1}→{healthAfter:F1} Died={died} Pierce={projectile.Pierce} Hits={projectile.EnemiesHit}");
+                            
+                            // Show damage number
+                            DamageNumberPool damagePool = GameServices.DamageNumberPool;
+                            if (damagePool != null)
+                            {
+                                damagePool.ShowDamage(enemy.Position, projectile.Damage);
+                            }
+                        }
+                        
+                        // Check if projectile should be deactivated (pierce check)
+                        if (projectile.RegisterHit())
+                        {
+                            projectile.Deactivate();
+                            break;
+                        }
+                    }
                 }
             }
         }
     }
     
     /// <summary>
-    /// Check all active orbiters against all active enemies
+    /// Check all active orbiters against nearby enemies using spatial hash grid
     /// </summary>
     private void CheckOrbiterEnemyCollisions()
     {
-        if (orbiterManager == null)
-        {
-            return;
-        }
-        if (enemyPool == null)
-        {
-            return;
-        }
+        if (orbiterManager == null || enemyPool == null) return;
         
         List<OrbiterProjectile> activeOrbiters = orbiterManager.GetActiveOrbiters();
-        if (activeOrbiters == null)
-        {
-            return;
-        }
-        if (activeOrbiters.Count == 0)
-        {
-            return; // No active orbiters, this is normal
-        }
+        if (activeOrbiters == null || activeOrbiters.Count == 0) return;
         
-        Enemy[] allEnemies = enemyPool.GetComponentsInChildren<Enemy>();
-        
-        int checkCount = 0;
         foreach (var orbiter in activeOrbiters)
         {
             if (orbiter == null || !orbiter.IsActive) continue;
             
-            foreach (var enemy in allEnemies)
+            // Query spatial grid for nearby enemies
+            var nearbyEntities = spatialGrid.Query(
+                orbiter.Position,
+                orbiter.CollisionRadius,
+                CollisionLayer.Enemy
+            );
+            
+            foreach (var entity in nearbyEntities)
             {
-                if (enemy == null || !enemy.gameObject.activeInHierarchy || !enemy.IsActive) continue;
-                
-                checkCount++;
-                float distance = Vector3.Distance(orbiter.transform.position, enemy.transform.position);
-                float combinedRadius = orbiter.CollisionRadius + enemy.CollisionRadius;
-                
-                if (distance < combinedRadius)
+                if (entity is Enemy enemy && enemy.gameObject.activeInHierarchy && enemy.IsActive)
                 {
-                    Health enemyHealth = enemy.GetComponent<Health>();
-                    if (enemyHealth != null && enemyHealth.IsAlive)
-                    {
-                        Debug.Log($"[ORBITER HIT] Orbiter collided with enemy! Distance={distance:F3}, CombinedRadius={combinedRadius:F3}, OrbiterRadius={orbiter.CollisionRadius:F3}, EnemyRadius={enemy.CollisionRadius:F3}");
-                        Debug.Log($"[ORBITER HIT] Positions: Orbiter={orbiter.transform.position}, Enemy={enemy.transform.position}");
-                        Debug.Log($"[ORBITER HIT] Enemy health before: {enemyHealth.CurrentHealth}, damage: {projectileDamage}");
-                        
-                        bool died = enemyHealth.TakeDamage(projectileDamage);
-                        
-                        Debug.Log($"[ORBITER HIT] Enemy health after: {enemyHealth.CurrentHealth}, died: {died}");
-                    }
+                    float distance = Vector3.Distance(orbiter.Position, enemy.Position);
+                    float combinedRadius = orbiter.CollisionRadius + enemy.CollisionRadius;
                     
-                    Debug.Log($"[ORBITER HIT] Deactivating orbiter for 2 seconds");
-                    orbiter.Deactivate();
-                    break;
+                    if (distance < combinedRadius)
+                    {
+                        Health enemyHealth = enemy.GetComponent<Health>();
+                        if (enemyHealth != null && enemyHealth.IsAlive)
+                        {
+                            DebugLog.Verbose($"[ORBITER HIT] Orbiter collided with enemy! Distance={distance:F3}, CombinedRadius={combinedRadius:F3}");
+                            
+                            float healthBefore = enemyHealth.CurrentHealth;
+                            bool died = enemyHealth.TakeDamage(projectileDamage);
+                            float healthAfter = enemyHealth.CurrentHealth;
+                            
+                            DebugLog.Info($"[ORBITER HIT] {enemy.name} - Damage={projectileDamage:F1} HP: {healthBefore:F1}→{healthAfter:F1} Died={died}");
+                            
+                            // Show damage number
+                            DamageNumberPool damagePool = GameServices.DamageNumberPool;
+                            if (damagePool != null)
+                            {
+                                damagePool.ShowDamage(enemy.Position, projectileDamage);
+                            }
+                        }
+                        
+                        DebugLog.Verbose($"[ORBITER HIT] Deactivating orbiter for 2 seconds");
+                        orbiter.Deactivate();
+                        break;
+                    }
                 }
             }
         }
     }
     
     /// <summary>
-    /// Check if player touched any enemy with cooldown-based damage and knockback
+    /// Check if player touched any nearby enemy with cooldown-based damage and knockback
     /// </summary>
     private void CheckPlayerEnemyCollisions()
     {
         if (playerTransform == null || enemyPool == null || playerHealth == null) return;
         
         // Skip if level-up UI is showing
-        LevelUpUI levelUpUI = FindAnyObjectByType<LevelUpUI>();
+        LevelUpUI levelUpUI = GameServices.LevelUpUI;
         if (levelUpUI != null && levelUpUI.IsShowingUI) return;
         
-        Enemy[] allEnemies = enemyPool.GetComponentsInChildren<Enemy>();
         Rigidbody2D playerRb = playerTransform.GetComponent<Rigidbody2D>();
         
-        foreach (var enemy in allEnemies)
+        // Query spatial grid for nearby enemies
+        var nearbyEntities = spatialGrid.Query(
+            playerTransform.position,
+            playerCollisionRadius,
+            CollisionLayer.Enemy
+        );
+        
+        foreach (var entity in nearbyEntities)
         {
-            if (!enemy.gameObject.activeInHierarchy || !enemy.IsActive) continue;
-            
-            float distance = Vector3.Distance(playerTransform.position, enemy.transform.position);
-            float combinedRadius = playerCollisionRadius + enemy.CollisionRadius;
-            
-            if (distance < combinedRadius)
+            if (entity is Enemy enemy && enemy.gameObject.activeInHierarchy && enemy.IsActive)
             {
-                // Only apply damage if cooldown elapsed
-                if (Time.time - lastPlayerDamageTime >= playerDamageCooldown)
-                {
-                    float damage = enemy.ContactDamage;
-                    bool died = playerHealth.TakeDamage(damage);
-                    lastPlayerDamageTime = Time.time;
-                    
-                    Debug.Log($"Player hit by {enemy.name}! Took {damage} damage, HP: {playerHealth.CurrentHealth}/{playerHealth.MaxHealth}");
-                    
-                    if (died)
-                    {
-                        Debug.Log("Player DIED!");
-                        gameOver = true;
-                        Time.timeScale = 0f;
-                        return;
-                    }
-                    
-                    // Apply knockback to player
-                    if (playerRb != null)
-                    {
-                        Vector2 knockbackDir = (playerTransform.position - enemy.transform.position).normalized;
-                        playerRb.AddForce(knockbackDir * 250f, ForceMode2D.Impulse);
-                        Debug.Log($"Player knocked back from enemy at {enemy.transform.position}");
-                    }
-                }
+                float distance = Vector3.Distance(playerTransform.position, enemy.Position);
+                float combinedRadius = playerCollisionRadius + enemy.CollisionRadius;
                 
-                break; // Only process one enemy collision per frame
+                if (distance < combinedRadius)
+                {
+                    // Only apply damage if cooldown elapsed
+                    if (Time.time - lastPlayerDamageTime >= playerDamageCooldown)
+                    {
+                        float damage = enemy.ContactDamage;
+                        bool died = playerHealth.TakeDamage(damage);
+                        lastPlayerDamageTime = Time.time;
+                        
+                        DebugLog.Info($"Player hit by {enemy.name}! Took {damage} damage, HP: {playerHealth.CurrentHealth}/{playerHealth.MaxHealth}");
+                        
+                        if (died)
+                        {
+                            DebugLog.Info("Player DIED!");
+                            gameOver = true;
+                            Time.timeScale = 0f;
+                            return;
+                        }
+                        
+                        // Apply knockback to player
+                        if (playerRb != null)
+                        {
+                            Vector2 knockbackDir = (playerTransform.position - enemy.Position).normalized;
+                            playerRb.AddForce(knockbackDir * 250f, ForceMode2D.Impulse);
+                            DebugLog.Verbose($"Player knocked back from enemy at {enemy.Position}");
+                        }
+                    }
+                    
+                    break; // Only process one enemy collision per frame
+                }
             }
         }
     }
     
     /// <summary>
-    /// Display game over UI
+    /// Display game over UI and spatial grid debug info
     /// </summary>
     private void OnGUI()
     {
@@ -247,6 +322,26 @@ private void CheckProjectileEnemyCollisions()
             // Restart instructions
             style.fontSize = 24;
             GUI.Label(new Rect(0, 100, Screen.width, Screen.height), "Press R to Restart", style);
+        }
+        
+        // Show spatial grid stats in top-left
+        if (showGridDebug && spatialGrid != null)
+        {
+            GUIStyle debugStyle = new GUIStyle();
+            debugStyle.fontSize = 12;
+            debugStyle.normal.textColor = Color.green;
+            GUI.Label(new Rect(10, 10, 400, 20), spatialGrid.GetDebugStats(), debugStyle);
+        }
+    }
+    
+    /// <summary>
+    /// Draw spatial grid in Scene view for debugging
+    /// </summary>
+    private void OnDrawGizmos()
+    {
+        if (showGridDebug && spatialGrid != null)
+        {
+            spatialGrid.DrawGizmos();
         }
     }
 }

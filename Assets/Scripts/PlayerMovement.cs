@@ -42,7 +42,7 @@ private void Update()
             logTimer += Time.unscaledDeltaTime;
             if (logTimer >= logInterval)
             {
-                Debug.Log($"[PAUSED] Player position: ({transform.position.x:F2}, {transform.position.y:F2})");
+                DebugLog.Verbose($"[PAUSED] Player position: ({transform.position.x:F2}, {transform.position.y:F2})");
                 logTimer = 0f;
             }
             return;
@@ -52,7 +52,7 @@ private void Update()
         logTimer += Time.deltaTime;
         if (logTimer >= logInterval)
         {
-            Debug.Log($"Player position: ({transform.position.x:F2}, {transform.position.y:F2})");
+            DebugLog.Verbose($"Player position: ({transform.position.x:F2}, {transform.position.y:F2})");
             logTimer = 0f;
         }
         

@@ -12,7 +12,7 @@ public class EnemyStats : ScriptableObject
     
     [Header("Combat Stats")]
     [Tooltip("Max health points")]
-    public float maxHealth = 10f;
+    public float maxHealth = 20f;
     
     [Tooltip("Damage dealt to player on contact per second")]
     public float contactDamage = 10f;

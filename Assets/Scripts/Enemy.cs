@@ -4,15 +4,13 @@ using UnityEngine;
 /// Simple, performant enemy that moves toward the player.
 /// Uses direct transform manipulation instead of physics for better performance with many enemies.
 /// </summary>
-public class Enemy : MonoBehaviour
+public class Enemy : MonoBehaviour, ICollidable
 {
     [SerializeField] private EnemyStats stats;
     private Health health;
     private Transform playerTransform;
     private SpriteRenderer spriteRenderer;
     private bool isActive;
-    private bool hasLoggedMovement = false; // For debugging movement issues
-    private static XPOrbPool xpOrbPool; // Shared pool reference
     private CircleCollider2D enemyCollider;
     private int currentCollisionCount = 0;
     
@@ -20,6 +18,10 @@ public class Enemy : MonoBehaviour
     public float CollisionRadius => 0.35f;
     public float ContactDamage => stats != null ? stats.contactDamage : 10f;
     public int XPDrop => stats != null ? stats.xpDrop : 5;
+    
+    // ICollidable implementation
+    public Vector3 Position => transform.position;
+    public CollisionLayer Layer => CollisionLayer.Enemy;
     
     private void OnCollisionEnter2D(Collision2D collision)
     {
@@ -101,14 +103,26 @@ public class Enemy : MonoBehaviour
         
         if (spriteRenderer != null && spriteRenderer.sprite == null)
         {
-            Texture2D texture = new Texture2D(64, 64);
-            Color[] pixels = new Color[64 * 64];
-            for (int i = 0; i < pixels.Length; i++)
-                pixels[i] = Color.white;
-            texture.SetPixels(pixels);
-            texture.Apply();
-            spriteRenderer.sprite = Sprite.Create(texture, new Rect(0, 0, 64, 64), new Vector2(0.5f, 0.5f), 64);
-            Debug.Log($"Enemy.Initialize: Created sprite for {name}, renderer={spriteRenderer != null}, sprite={spriteRenderer.sprite != null}");
+            DebugLog.Warning($"Enemy.Initialize: Sprite is null, attempting to load from SpriteLoader for {stats?.enemyName}");
+            if (stats != null)
+            {
+                spriteRenderer.sprite = SpriteLoader.LoadEnemySprite(stats.enemyName, stats.color);
+                if (spriteRenderer.sprite != null)
+                {
+                    DebugLog.Info($"Enemy.Initialize: Loaded sprite for {stats.enemyName}: {spriteRenderer.sprite.texture.width}x{spriteRenderer.sprite.texture.height}px");
+                }
+                else
+                {
+                    DebugLog.Error($"Enemy.Initialize: Failed to load sprite for {stats.enemyName}, using fallback");
+                    Texture2D texture = new Texture2D(64, 64);
+                    Color[] pixels = new Color[64 * 64];
+                    for (int i = 0; i < pixels.Length; i++)
+                        pixels[i] = Color.white;
+                    texture.SetPixels(pixels);
+                    texture.Apply();
+                    spriteRenderer.sprite = Sprite.Create(texture, new Rect(0, 0, 64, 64), new Vector2(0.5f, 0.5f), 64);
+                }
+            }
         }
         
         if (stats != null && spriteRenderer != null)
@@ -134,12 +148,17 @@ public class Enemy : MonoBehaviour
             spriteRenderer = GetComponent<SpriteRenderer>();
             if (spriteRenderer != null && spriteRenderer.sprite == null)
             {
-                // Create sprite based on enemy type
-                if (stats.enemyName == "Blob")
-                    spriteRenderer.sprite = SpriteGenerator.CreateBlobSprite(stats.color);
-                else
-                    spriteRenderer.sprite = SpriteGenerator.CreateSkeletonSprite(stats.color);
+                // Load sprite based on enemy type (from Resources or procedural fallback)
+                spriteRenderer.sprite = SpriteLoader.LoadEnemySprite(stats.enemyName, stats.color);
+                if (spriteRenderer.sprite != null)
+                {
+                    DebugLog.Info($"Enemy.Activate: Loaded sprite for {stats.enemyName}: {spriteRenderer.sprite.texture.width}x{spriteRenderer.sprite.texture.height}px, PPU={spriteRenderer.sprite.pixelsPerUnit}");
+                }
             }
+        }
+        else if (spriteRenderer != null && spriteRenderer.sprite != null)
+        {
+            DebugLog.Info($"Enemy.Activate: Using existing sprite for {stats.enemyName}: {spriteRenderer.sprite.texture.width}x{spriteRenderer.sprite.texture.height}px");
         }
         
         // Lazy initialization if not already done
@@ -153,14 +172,12 @@ public class Enemy : MonoBehaviour
                 playerTransform = playerObj.transform;
         }
         
-        // Create sprite if it doesn't exist
+        // Load sprite if it doesn't exist
         if (spriteRenderer != null && spriteRenderer.sprite == null)
         {
-            // Create sprite based on enemy type
-            if (stats != null && stats.enemyName == "Blob")
-                spriteRenderer.sprite = SpriteGenerator.CreateBlobSprite(stats.color);
-            else if (stats != null)
-                spriteRenderer.sprite = SpriteGenerator.CreateSkeletonSprite(stats.color);
+            // Load sprite based on enemy type (from Resources or procedural fallback)
+            if (stats != null)
+                spriteRenderer.sprite = SpriteLoader.LoadEnemySprite(stats.enemyName, stats.color);
         }
         
         if (health == null)
@@ -172,7 +189,7 @@ public class Enemy : MonoBehaviour
         health.OnDeath -= HandleDeath; // Remove first to avoid duplicates
         health.OnDeath += HandleDeath;
         
-        Debug.Log($"Enemy.Activate: {stats?.enemyName} subscribed to OnDeath event");
+        DebugLog.Info($"Enemy.Activate: {stats?.enemyName} subscribed to OnDeath event");
         
         if (health != null && stats != null)
             health.Initialize(stats.maxHealth);
@@ -182,10 +199,9 @@ public class Enemy : MonoBehaviour
         {
             spriteRenderer.color = stats.color;
             transform.localScale = Vector3.one * stats.scale;
-            Debug.Log($"Enemy activated: {stats.enemyName}, pos={position}, color={stats.color}, scale={stats.scale}, spriteColor={spriteRenderer.color}, sprite={spriteRenderer.sprite != null}");
+            DebugLog.Info($"Enemy activated: {stats.enemyName}, pos={position}, color={stats.color}, scale={stats.scale}, spriteColor={spriteRenderer.color}, sprite={spriteRenderer.sprite != null}");
         }
         
-        hasLoggedMovement = false; // Reset for new activation
         isActive = true;
         gameObject.SetActive(true);
     }
@@ -195,32 +211,34 @@ public class Enemy : MonoBehaviour
     /// </summary>
     public void Deactivate()
     {
+        DebugLog.Info($"[Enemy.Deactivate] {stats?.enemyName} being deactivated and returned to pool");
+        
         isActive = false;
         currentCollisionCount = 0;
         if (spriteRenderer != null)
             spriteRenderer.color = Color.white;
         gameObject.SetActive(false);
+        
+        // Notify pool to remove from active list (failsafe)
+        EnemyPool pool = GetComponentInParent<EnemyPool>();
+        if (pool != null)
+            pool.ReturnEnemy(this);
     }
     
     private void HandleDeath()
     {
-        Debug.Log($"Enemy.HandleDeath: {stats?.enemyName} died at {transform.position}");
+        DebugLog.Info($"Enemy.HandleDeath: {stats?.enemyName} died at {transform.position}");
         
-        // Spawn XP orb
-        if (xpOrbPool == null)
+        // Spawn XP orb using GameServices
+        XPOrbPool pool = GameServices.XPOrbPool;
+        if (pool != null && stats != null)
         {
-            xpOrbPool = FindAnyObjectByType<XPOrbPool>();
-            Debug.Log($"Enemy.HandleDeath: Found XPOrbPool = {xpOrbPool != null}");
-        }
-        
-        if (xpOrbPool != null && stats != null)
-        {
-            Debug.Log($"Enemy.HandleDeath: Spawning {stats.xpDrop} XP at {transform.position}");
-            xpOrbPool.SpawnOrb(transform.position, stats.xpDrop);
+            DebugLog.Info($"Enemy.HandleDeath: Spawning {stats.xpDrop} XP at {transform.position}");
+            pool.SpawnOrb(transform.position, stats.xpDrop);
         }
         else
         {
-            Debug.LogWarning($"Enemy.HandleDeath: Cannot spawn XP - pool={xpOrbPool != null}, stats={stats != null}");
+            DebugLog.Warning($"Enemy.HandleDeath: Cannot spawn XP - pool={pool != null}, stats={stats != null}");
         }
         
         Deactivate();
@@ -232,20 +250,10 @@ public class Enemy : MonoBehaviour
         
         if (!isActive || playerTransform == null)
         {
-            if (!hasLoggedMovement && isActive)
-            {
-                Debug.Log($"Enemy.Update: Not moving - isActive={isActive}, player={playerTransform != null}");
-                hasLoggedMovement = true;
-            }
             return;
         }
         
-        if (!hasLoggedMovement)
-        {
-            Debug.Log($"Enemy.Update: Moving toward player, pos={transform.position}, playerPos={playerTransform.position}");
-            hasLoggedMovement = true;
-        }
-        
+        // Move toward player (removed verbose logging)
         Vector3 direction = (playerTransform.position - transform.position).normalized;
         float speed = stats != null ? stats.moveSpeed : 2f;
         transform.position += direction * speed * Time.deltaTime;

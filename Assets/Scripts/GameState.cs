@@ -44,7 +44,7 @@ public class GameState : MonoBehaviour
         if (instance != null)
         {
             instance.isPaused = paused;
-            Debug.Log($"GameState: Game {(paused ? "PAUSED" : "RESUMED")}");
+            DebugLog.Info($"GameState: Game {(paused ? "PAUSED" : "RESUMED")}");
         }
     }
     
@@ -56,7 +56,7 @@ public class GameState : MonoBehaviour
         if (instance != null)
         {
             instance.isGameOver = gameOver;
-            Debug.Log($"GameState: Game Over = {gameOver}");
+            DebugLog.Info($"GameState: Game Over = {gameOver}");
         }
     }
     
@@ -69,7 +69,7 @@ public class GameState : MonoBehaviour
         {
             instance.isPaused = false;
             instance.isGameOver = false;
-            Debug.Log("GameState: Reset");
+            DebugLog.Info("GameState: Reset");
         }
     }
 }

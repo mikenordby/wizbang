@@ -1,79 +1,60 @@
 using UnityEngine;
-using System.Collections.Generic;
 
 /// <summary>
 /// High-performance object pool for projectiles
 /// </summary>
-public class ProjectilePool : MonoBehaviour
+public class ProjectilePool : ObjectPool<Projectile>
 {
     [SerializeField] private GameObject projectilePrefab;
-    [SerializeField] private int initialPoolSize = 50;
-    [SerializeField] private int maxPoolSize = 200;
-    
-    private List<Projectile> pool = new List<Projectile>();
-    
-    private void Awake()
-    {
-        // Pre-allocate projectiles
-        for (int i = 0; i < initialPoolSize; i++)
-        {
-            CreateNewProjectile();
-        }
-    }
     
     /// <summary>
     /// Get an available projectile from the pool
     /// </summary>
     public Projectile GetProjectile()
     {
-        // Find inactive projectile
-        foreach (var projectile in pool)
-        {
-            if (!projectile.IsActive)
-            {
-                return projectile;
-            }
-        }
-        
-        // Create new if under max
-        if (pool.Count < maxPoolSize)
-        {
-            return CreateNewProjectile();
-        }
-        
-        // All in use, reuse oldest
-        return pool[0];
+        return GetItem();
     }
     
     /// <summary>
-    /// Get all currently active projectiles
+    /// Get all currently active projectiles (cached list, no GC)
     /// </summary>
-    public List<Projectile> GetActiveProjectiles()
+    public System.Collections.Generic.List<Projectile> GetActiveProjectiles()
     {
-        List<Projectile> active = new List<Projectile>();
-        foreach (var projectile in pool)
-        {
-            if (projectile.IsActive)
-            {
-                active.Add(projectile);
-            }
-        }
-        return active;
+        return activeItems;
     }
     
-    private Projectile CreateNewProjectile()
+    /// <summary>
+    /// Remove projectile from active list (called by Projectile.Deactivate)
+    /// </summary>
+    public void ReturnProjectile(Projectile projectile)
+    {
+        ReturnItem(projectile);
+    }
+    
+    protected override Projectile CreateNewItem()
     {
         GameObject go = Instantiate(projectilePrefab, transform);
         Projectile projectile = go.GetComponent<Projectile>();
         
-        // Create fireball sprite
+        // Load fireball sprite (from Resources or procedural fallback)
         SpriteRenderer sr = go.GetComponent<SpriteRenderer>();
         if (sr == null)
             sr = go.AddComponent<SpriteRenderer>();
-        sr.sprite = SpriteGenerator.CreateFireballSprite();
+        sr.sprite = SpriteLoader.LoadProjectileSprite("fireball");
+        go.transform.localScale = Vector3.one * 1.5f; // Larger projectiles
         
         projectile.Deactivate();
         pool.Add(projectile);
+        
+        // Add to active list if item is being created during GetItem()
+        if (!activeItems.Contains(projectile))
+            activeItems.Add(projectile);
+        
         return projectile;
+    }
+    
+    protected override bool IsActive(Projectile item)
+    {
+        return item.IsActive;
     }
 }

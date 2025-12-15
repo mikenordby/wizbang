@@ -12,10 +12,11 @@ public class Enemy : MonoBehaviour, ICollidable
     private SpriteRenderer spriteRenderer;
     private bool isActive;
     private CircleCollider2D enemyCollider;
+    private Rigidbody2D rb;
     private int currentCollisionCount = 0;
     
     public bool IsActive => isActive;
-    public float CollisionRadius => 0.35f;
+    public float CollisionRadius => 0.4f; // Enemy body: 64px at 64 PPU = ~0.8 diameter
     public float ContactDamage => stats != null ? stats.contactDamage : 10f;
     public int XPDrop => stats != null ? stats.xpDrop : 5;
     
@@ -85,12 +86,12 @@ public class Enemy : MonoBehaviour, ICollidable
         if (enemyCollider == null)
         {
             enemyCollider = gameObject.AddComponent<CircleCollider2D>();
-            enemyCollider.radius = 0.25f; // Slightly larger than collision detection radius
-            enemyCollider.isTrigger = false; // Physical collision
+            enemyCollider.radius = 0.4f; // Match visual body size for pushing
+            enemyCollider.isTrigger = false; // Physical collision for pushing
         }
         
         // Add Rigidbody2D for physics
-        Rigidbody2D rb = GetComponent<Rigidbody2D>();
+        rb = GetComponent<Rigidbody2D>();
         if (rb == null)
         {
             rb = gameObject.AddComponent<Rigidbody2D>();
@@ -98,7 +99,8 @@ public class Enemy : MonoBehaviour, ICollidable
             rb.gravityScale = 0f;
             rb.constraints = RigidbodyConstraints2D.FreezeRotation;
             rb.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
-            rb.mass = 3f; // Increased for better collision response
+            rb.mass = 1f; // Light mass for responsive collision
+            rb.linearDamping = 2f; // Add drag so enemies don't slide when pushed
         }
         
         if (spriteRenderer != null && spriteRenderer.sprite == null)
@@ -253,10 +255,21 @@ public class Enemy : MonoBehaviour, ICollidable
             return;
         }
         
-        // Move toward player (removed verbose logging)
+        // Move toward player using Rigidbody2D for proper physics collision
         Vector3 direction = (playerTransform.position - transform.position).normalized;
         float speed = stats != null ? stats.moveSpeed : 2f;
-        transform.position += direction * speed * Time.deltaTime;
+        
+        // Use Rigidbody2D.MovePosition for physics-aware movement
+        if (rb != null)
+        {
+            Vector2 newPosition = rb.position + (Vector2)(direction * speed * Time.deltaTime);
+            rb.MovePosition(newPosition);
+        }
+        else
+        {
+            // Fallback if no Rigidbody2D (shouldn't happen)
+            transform.position += direction * speed * Time.deltaTime;
+        }
     }
     
     /// <summary>

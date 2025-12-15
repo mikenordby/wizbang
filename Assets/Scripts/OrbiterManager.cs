@@ -128,7 +128,7 @@ public class OrbiterManager : MonoBehaviour
         
         // Add CircleCollider2D
         CircleCollider2D collider = orbiterObj.AddComponent<CircleCollider2D>();
-        collider.radius = 0.35f;
+        collider.radius = 0.25f; // Match knife blade width
         collider.isTrigger = true;
         
         // Add orbiter component

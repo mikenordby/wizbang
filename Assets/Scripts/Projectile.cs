@@ -13,7 +13,7 @@ public class Projectile : BaseProjectile, ICollidable
     private float speed;
     private float lifetimeRemaining;
     
-    public override float CollisionRadius => 0.15f; // Smaller collision for straight projectiles
+    public override float CollisionRadius => 0.2f; // Knife tip: 64px sprite, blade is ~25px wide
     
     // ICollidable implementation
     public Vector3 Position => transform.position;

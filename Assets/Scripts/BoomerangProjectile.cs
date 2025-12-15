@@ -19,7 +19,7 @@ public class BoomerangProjectile : BaseProjectile, ICollidable
     private float lifetime;
     private float maxLifetime = 5f;
     
-    public override float CollisionRadius => 0.25f;
+    public override float CollisionRadius => 0.3f; // Boomerang arc blade
     
     // ICollidable implementation
     public Vector3 Position => transform.position;

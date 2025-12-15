@@ -52,7 +52,7 @@ public class Player : MonoBehaviour, ICollidable
     
     // ICollidable implementation
     public Vector3 Position => transform.position;
-    public float CollisionRadius => 0.35f;
+    public float CollisionRadius => 0.4f; // Wizard body: 128px sprite at 128 PPU = ~0.8 diameter
     public bool IsActive => true; // Player always active
     public CollisionLayer Layer => CollisionLayer.Player;
     
@@ -134,10 +134,7 @@ public class Player : MonoBehaviour, ICollidable
             DebugLog.Error("Player.Start: Failed to load wizard sprite!");
         }
         
-        if (oldSprite != null && oldSprite != sr.sprite)
-        {
-            DebugLog.Warning($"Player.Start: Sprite was replaced (old: {oldSprite.texture.width}x{oldSprite.texture.height}px)");
-        }
+        // Sprite replacement is expected during asset updates, no warning needed
         
         DebugLog.Info($"Player.Start: Level {currentLevel}, XP {currentXP}/{xpToNextLevel}");
     }

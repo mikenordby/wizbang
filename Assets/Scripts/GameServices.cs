@@ -35,6 +35,8 @@ public class GameServices : MonoBehaviour
     private OrbiterManager orbiterManager;
     private LevelUpUI levelUpUI;
     private DamageNumberPool damageNumberPool;
+    private Player player;
+    private DamageCalculator damageCalculator;
     
     // Public accessors with null safety
     public static XPOrbPool XPOrbPool => Instance?.xpOrbPool;
@@ -44,6 +46,8 @@ public class GameServices : MonoBehaviour
     public static OrbiterManager OrbiterManager => Instance?.orbiterManager;
     public static LevelUpUI LevelUpUI => Instance?.levelUpUI;
     public static DamageNumberPool DamageNumberPool => Instance?.damageNumberPool;
+    public static Player Player => Instance?.player;
+    public static DamageCalculator DamageCalculator => Instance?.damageCalculator;
     
     private void Awake()
     {
@@ -80,6 +84,8 @@ public class GameServices : MonoBehaviour
         orbiterManager = FindFirstObjectByType<OrbiterManager>();
         levelUpUI = FindFirstObjectByType<LevelUpUI>();
         damageNumberPool = FindFirstObjectByType<DamageNumberPool>();
+        player = FindFirstObjectByType<Player>();
+        damageCalculator = FindFirstObjectByType<DamageCalculator>();
         
         // Log warnings for missing services
         if (xpOrbPool == null) DebugLog.Warning("[GameServices] XPOrbPool not found");
@@ -88,5 +94,7 @@ public class GameServices : MonoBehaviour
         if (collisionManager == null) DebugLog.Warning("[GameServices] CollisionManager not found");
         if (orbiterManager == null) DebugLog.Warning("[GameServices] OrbiterManager not found");
         if (levelUpUI == null) DebugLog.Warning("[GameServices] LevelUpUI not found");
+        if (player == null) DebugLog.Warning("[GameServices] Player not found");
+        if (damageCalculator == null) DebugLog.Warning("[GameServices] DamageCalculator not found");
     }
 }

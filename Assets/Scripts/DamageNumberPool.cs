@@ -38,4 +38,12 @@ public class DamageNumberPool : MonoBehaviour
         // Show the damage number
         damageNumber.Show(position, damage, isCrit);
     }
+    
+    /// <summary>
+    /// Show a critical hit damage number (gold color, 1.5x size)
+    /// </summary>
+    public void ShowCriticalDamage(Vector3 position, float damage)
+    {
+        ShowDamage(position, damage, isCrit: true);
+    }
 }

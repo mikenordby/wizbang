@@ -40,12 +40,12 @@ public class DamageNumber : MonoBehaviour
         // Set text
         textMesh.text = damage.ToString("F0");
         
-        // Set color based on crit
-        startColor = isCrit ? Color.yellow : Color.white;
+        // Set color based on crit (gold #FFD700 for crits)
+        startColor = isCrit ? new Color(1f, 0.843f, 0f) : Color.white; // Gold: #FFD700
         textMesh.color = startColor;
         
-        // Make larger if crit
-        textMesh.fontSize = isCrit ? 4 : 3;
+        // Make 1.5x larger if crit
+        textMesh.fontSize = isCrit ? 4.5f : 3f;
         
         gameObject.SetActive(true);
     }

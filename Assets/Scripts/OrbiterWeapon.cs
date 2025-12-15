@@ -15,6 +15,8 @@ public class OrbiterWeapon : Weapon
         baseDamage = 15f;
         baseFireRate = 0f; // Always active, no firing
         projectileCount = 1; // Start with 1 orbiter, upgrades add more
+        projectileSpeed = 0f; // Not used for orbiters (they orbit, not fly)
+        projectileSize = 1.5f; // Larger spinning blades
         
         base.Awake(); // This calls RecalculateStats()
         

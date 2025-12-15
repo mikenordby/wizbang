@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: BlobStats
   m_EditorClassIdentifier: Assembly-CSharp::EnemyStats
   enemyName: Blob
-  maxHealth: 2
+  maxHealth: 5
   contactDamage: 10
   moveSpeed: 2
   xpDrop: 1

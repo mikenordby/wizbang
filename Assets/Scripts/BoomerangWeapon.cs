@@ -8,9 +8,6 @@ using System.Collections.Generic;
 public class BoomerangWeapon : Weapon
 {
     [Header("Boomerang Settings")]
-    [SerializeField] private float throwDistance = 8f;
-    [SerializeField] private float returnSpeed = 12f;
-    
     private List<BoomerangProjectile> boomerangPool = new List<BoomerangProjectile>();
     private int poolSize = 20;
     
@@ -23,6 +20,8 @@ public class BoomerangWeapon : Weapon
         projectileCount = 1;
         basePierce = 5; // Can hit multiple enemies on the way out AND back
         baseRange = 1.2f;
+        projectileSpeed = 10f; // Throw speed
+        projectileSize = 0.8f; // Slightly smaller than missiles
         
         base.Awake();
         
@@ -47,7 +46,7 @@ public class BoomerangWeapon : Weapon
             
             // Add collider
             CircleCollider2D collider = boomerangObj.AddComponent<CircleCollider2D>();
-            collider.radius = 0.25f;
+            collider.radius = 0.3f; // Match boomerang blade arc
             collider.isTrigger = true;
             
             // Add boomerang component
@@ -93,7 +92,7 @@ public class BoomerangWeapon : Weapon
             
             // Activate boomerang with arc motion
             boomerang.ActivateArc(playerTransform.position, targetDir, playerTransform);
-            boomerang.SetStats(currentDamage, currentPierce);
+            boomerang.SetStats(currentDamage, currentPierce, DamageType.Physical);
         }
         
         DebugLog.Verbose($"[BoomerangWeapon] Fired {currentProjectileCount} boomerang(s)");

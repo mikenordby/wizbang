@@ -12,8 +12,7 @@ public class CollisionManager : MonoBehaviour
     [SerializeField] private ProjectilePool projectilePool;
     [SerializeField] private EnemyPool enemyPool;
     [SerializeField] private OrbiterManager orbiterManager;
-    [SerializeField] private float playerCollisionRadius = 0.35f;
-    [SerializeField] private float projectileDamage = 100f; // 1-hit kill for all enemies
+    [SerializeField] private float playerCollisionRadius = 0.4f; // Match wizard body size
     
     [Header("Spatial Hash Grid Settings")]
     [Tooltip("Cell size for spatial partitioning (should be ~2x max collision radius)")]
@@ -156,28 +155,50 @@ public class CollisionManager : MonoBehaviour
                     
                     if (distance < combinedRadius)
                     {
-                        Health enemyHealth = enemy.GetComponent<Health>();
-                        if (enemyHealth != null)
+                        // Check if projectile has already hit this enemy (prevents double-hits on consecutive frames)
+                        int enemyID = enemy.gameObject.GetInstanceID();
+                        if (projectile.RegisterHit(enemyID))
                         {
-                            float healthBefore = enemyHealth.CurrentHealth;
-                            bool died = enemyHealth.TakeDamage(projectile.Damage);
-                            float healthAfter = enemyHealth.CurrentHealth;
-                            
-                            DebugLog.Info($"[PROJECTILE HIT] {enemy.name} - Damage={projectile.Damage:F1} HP: {healthBefore:F1}→{healthAfter:F1} Died={died} Pierce={projectile.Pierce} Hits={projectile.EnemiesHit}");
-                            
-                            // Show damage number
-                            DamageNumberPool damagePool = GameServices.DamageNumberPool;
-                            if (damagePool != null)
+                            // RegisterHit returns false if already hit this enemy
+                            // Only apply damage if this is a new hit
+                            Health enemyHealth = enemy.GetComponent<Health>();
+                            if (enemyHealth != null)
                             {
-                                damagePool.ShowDamage(enemy.Position, projectile.Damage);
+                                // Calculate damage with crits and player multipliers
+                                DamageContext context = new DamageContext
+                                {
+                                    baseDamage = projectile.Damage,
+                                    player = GameServices.Player,
+                                    enemy = enemy,
+                                    damageType = projectile.DamageType
+                                };
+                                
+                                DamageResult result = DamageCalculator.Instance.CalculateDamage(context);
+                                
+                                float healthBefore = enemyHealth.CurrentHealth;
+                                bool died = enemyHealth.TakeDamage(result.finalDamage);
+                                float healthAfter = enemyHealth.CurrentHealth;
+                                
+                                string critText = result.isCritical ? " CRIT!" : "";
+                                DebugLog.Info($"[PROJECTILE HIT] {enemy.name} - Damage={result.finalDamage:F1}{critText} HP: {healthBefore:F1}→{healthAfter:F1} Died={died} Pierce={projectile.Pierce} Hits={projectile.EnemiesHit}");
+                                
+                                // Show damage number (gold for crits)
+                                DamageNumberPool damagePool = GameServices.DamageNumberPool;
+                                if (damagePool != null)
+                                {
+                                    if (result.isCritical)
+                                        damagePool.ShowCriticalDamage(enemy.Position, result.finalDamage);
+                                    else
+                                        damagePool.ShowDamage(enemy.Position, result.finalDamage);
+                                }
                             }
-                        }
-                        
-                        // Check if projectile should be deactivated (pierce check)
-                        if (projectile.RegisterHit())
-                        {
-                            projectile.Deactivate();
-                            break;
+                            
+                            // RegisterHit returns true if projectile should be deactivated (pierce exhausted)
+                            if (projectile.EnemiesHit > projectile.Pierce)
+                            {
+                                projectile.Deactivate();
+                                break;
+                            }
                         }
                     }
                 }
@@ -220,17 +241,32 @@ public class CollisionManager : MonoBehaviour
                         {
                             DebugLog.Verbose($"[ORBITER HIT] Orbiter collided with enemy! Distance={distance:F3}, CombinedRadius={combinedRadius:F3}");
                             
+                            // Calculate damage with crits and player multipliers
+                            DamageContext context = new DamageContext
+                            {
+                                baseDamage = orbiter.Damage,
+                                player = GameServices.Player,
+                                enemy = enemy,
+                                damageType = orbiter.DamageType
+                            };
+                            
+                            DamageResult result = DamageCalculator.Instance.CalculateDamage(context);
+                            
                             float healthBefore = enemyHealth.CurrentHealth;
-                            bool died = enemyHealth.TakeDamage(projectileDamage);
+                            bool died = enemyHealth.TakeDamage(result.finalDamage);
                             float healthAfter = enemyHealth.CurrentHealth;
                             
-                            DebugLog.Info($"[ORBITER HIT] {enemy.name} - Damage={projectileDamage:F1} HP: {healthBefore:F1}→{healthAfter:F1} Died={died}");
+                            string critText = result.isCritical ? " CRIT!" : "";
+                            DebugLog.Info($"[ORBITER HIT] {enemy.name} - Damage={result.finalDamage:F1}{critText} HP: {healthBefore:F1}→{healthAfter:F1} Died={died}");
                             
-                            // Show damage number
+                            // Show damage number (gold for crits)
                             DamageNumberPool damagePool = GameServices.DamageNumberPool;
                             if (damagePool != null)
                             {
-                                damagePool.ShowDamage(enemy.Position, projectileDamage);
+                                if (result.isCritical)
+                                    damagePool.ShowCriticalDamage(enemy.Position, result.finalDamage);
+                                else
+                                    damagePool.ShowDamage(enemy.Position, result.finalDamage);
                             }
                         }
                         

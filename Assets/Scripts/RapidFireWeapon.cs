@@ -6,10 +6,6 @@ using UnityEngine;
 /// </summary>
 public class RapidFireWeapon : Weapon
 {
-    [Header("Rapid Fire Settings")]
-    [SerializeField] private float bulletSpeed = 15f; // Faster than magic missile
-    [SerializeField] private float spreadAngle = 8f; // Slight spread for multiple projectiles
-    
     private ProjectilePool projectilePool;
     
     protected override void Awake()
@@ -21,6 +17,9 @@ public class RapidFireWeapon : Weapon
         projectileCount = 1;
         basePierce = 0; // No pierce by default
         baseRange = 0.8f; // Shorter range
+        spreadAngle = 8f; // Slight spread
+        projectileSpeed = 15f; // Faster bullets
+        projectileSize = 0.5f; // Smaller bullets
         
         base.Awake();
         
@@ -67,15 +66,15 @@ public class RapidFireWeapon : Weapon
             // Spawn bullet
             bullet.transform.position = playerTransform.position;
             bullet.ActivateStraight(playerTransform.position, shootDir);
-            bullet.SetStats(currentDamage, currentPierce);
+            bullet.SetStats(currentDamage, currentPierce, DamageType.Physical);
             
-            // Make bullets yellow and small
+            // Make bullets yellow
             SpriteRenderer sr = bullet.GetComponent<SpriteRenderer>();
             if (sr != null)
             {
                 sr.sprite = SpriteLoader.LoadProjectileSprite("fireball");
                 sr.color = Color.yellow;
-                bullet.transform.localScale = Vector3.one * 0.5f; // Smaller bullets
+                bullet.transform.localScale = Vector3.one * projectileSize; // Use weapon's projectileSize
             }
         }
         

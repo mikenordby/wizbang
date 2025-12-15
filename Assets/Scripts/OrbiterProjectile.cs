@@ -17,7 +17,7 @@ public class OrbiterProjectile : BaseProjectile, ICollidable
     // Public so other orbiters can check our angle for respawn spacing
     public float currentAngle { get; private set; }
     
-    public override float CollisionRadius => 0.35f;
+    public override float CollisionRadius => 0.25f; // Knife: 64px sprite, full blade width
     
     // ICollidable implementation
     public Vector3 Position => transform.position;

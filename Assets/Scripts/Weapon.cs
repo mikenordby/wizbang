@@ -17,6 +17,23 @@ public abstract class Weapon : MonoBehaviour
     [SerializeField] protected int basePierce = 0;
     [SerializeField] protected float baseRange = 1f; // Multiplier for projectile lifetime
     
+    [Header("Projectile Properties")]
+    [Tooltip("Base movement speed of projectiles")]
+    [SerializeField] protected float projectileSpeed = 8f;
+    
+    [Tooltip("Visual and collision size multiplier (1.0 = normal)")]
+    [SerializeField] protected float projectileSize = 1f;
+    
+    [Tooltip("Type of damage (affects future elemental interactions)")]
+    [SerializeField] protected DamageType damageType = DamageType.Physical;
+    
+    [Header("Advanced Properties")]
+    [Tooltip("Spread angle in degrees for multiple projectiles (0 = parallel)")]
+    [SerializeField] protected float spreadAngle = 0f;
+    
+    [Tooltip("Enable homing behavior (targets nearest enemy)")]
+    [SerializeField] protected bool homing = false;
+    
     // Individual upgrade tracking
     protected Dictionary<WeaponUpgrade.UpgradeType, WeaponUpgrade> upgrades = new Dictionary<WeaponUpgrade.UpgradeType, WeaponUpgrade>();
     

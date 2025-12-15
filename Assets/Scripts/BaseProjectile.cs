@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections.Generic;
 
 /// <summary>
 /// Base class for all projectile types (straight, orbiter, homing, etc.)
@@ -13,12 +14,15 @@ public abstract class BaseProjectile : MonoBehaviour
     protected float damage;
     protected int pierce;
     protected int enemiesHit;
+    protected HashSet<int> hitEnemyIDs = new HashSet<int>();
+    protected DamageType damageType = DamageType.Physical;
     
     public bool IsActive => isActive;
     public virtual float CollisionRadius => collisionRadius;
     public float Damage => damage;
     public int Pierce => pierce;
     public int EnemiesHit => enemiesHit;
+    public DamageType DamageType => damageType;
     
     protected virtual void Awake()
     {
@@ -28,24 +32,38 @@ public abstract class BaseProjectile : MonoBehaviour
     }
     
     /// <summary>
-    /// Set projectile stats (damage and pierce)
+    /// Set projectile stats (damage, pierce, and damage type)
     /// </summary>
-    public virtual void SetStats(float damageValue, int pierceValue)
+    public virtual void SetStats(float damageValue, int pierceValue, DamageType type = DamageType.Physical)
     {
         damage = damageValue;
         pierce = pierceValue;
+        damageType = type;
         enemiesHit = 0;
-        DebugLog.Verbose($"[BaseProjectile] SetStats: damage={damage:F1}, pierce={pierce}, enemiesHit reset to 0");
+        hitEnemyIDs.Clear();
+        DebugLog.Verbose($"[BaseProjectile] SetStats: damage={damage:F1}, pierce={pierce}, type={damageType}, enemiesHit reset to 0, hitEnemyIDs cleared");
     }
     
     /// <summary>
     /// Increment hit counter, returns true if projectile should be deactivated
+    /// Prevents same enemy from being hit multiple times on consecutive frames
     /// </summary>
-    public bool RegisterHit()
+    /// <param name="enemyInstanceID">GetInstanceID() of the enemy GameObject</param>
+    /// <returns>True if projectile should deactivate, false if already hit this enemy or still has pierce</returns>
+    public bool RegisterHit(int enemyInstanceID)
     {
+        // Check if we've already hit this enemy
+        if (hitEnemyIDs.Contains(enemyInstanceID))
+        {
+            DebugLog.Verbose($"[BaseProjectile] RegisterHit: Already hit enemy {enemyInstanceID}, skipping");
+            return false; // Don't count as a hit, projectile stays active
+        }
+        
+        // New enemy hit
+        hitEnemyIDs.Add(enemyInstanceID);
         enemiesHit++;
         bool shouldDeactivate = enemiesHit > pierce; // Deactivate if hit more enemies than pierce allows
-        DebugLog.Verbose($"[BaseProjectile] RegisterHit: enemiesHit={enemiesHit}, pierce={pierce}, shouldDeactivate={shouldDeactivate}");
+        DebugLog.Verbose($"[BaseProjectile] RegisterHit: New enemy {enemyInstanceID}, enemiesHit={enemiesHit}, pierce={pierce}, shouldDeactivate={shouldDeactivate}");
         return shouldDeactivate;
     }
     

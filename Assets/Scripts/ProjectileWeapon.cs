@@ -6,9 +6,6 @@ using UnityEngine;
 /// </summary>
 public class ProjectileWeapon : Weapon
 {
-    [Header("Projectile Settings")]
-    [SerializeField] private float spreadAngle = 15f; // Degrees between projectiles when count > 1
-    
     private ProjectilePool projectilePool;
     private EnemyPool enemyPool;
     
@@ -18,6 +15,8 @@ public class ProjectileWeapon : Weapon
         weaponName = "Magic Missile";
         baseDamage = 10f;
         baseFireRate = 1f;
+        spreadAngle = 15f; // Spread for multiple projectiles
+        projectileSpeed = 8f;
         
         base.Awake(); // This calls RecalculateStats()
         
@@ -63,7 +62,7 @@ public class ProjectileWeapon : Weapon
             if (projectile != null)
             {
                 DebugLog.Info($"[ProjectileWeapon.Fire] Setting projectile stats: damage={currentDamage:F1} pierce={currentPierce}");
-                projectile.SetStats(currentDamage, currentPierce);
+                projectile.SetStats(currentDamage, currentPierce, DamageType.Physical);
                 projectile.ActivateStraight(playerTransform.position, direction);
             }
             else

@@ -2,8 +2,8 @@ using UnityEngine;
 using UnityEngine.Tilemaps;
 
 /// <summary>
-/// Manages the game background using tilesets or generated patterns.
-/// Uses Cainos grass tileset if available, falls back to procedural background.
+/// Manages the game background using procedurally generated grass with dirt paths.
+/// Creates infinite scrolling grass background that follows camera.
 /// </summary>
 public class BackgroundManager : MonoBehaviour
 {
@@ -62,9 +62,6 @@ public class BackgroundManager : MonoBehaviour
         backgroundRenderer = bgObj.AddComponent<SpriteRenderer>();
         backgroundRenderer.sortingOrder = -100; // Draw behind everything
         
-        // Try to load tileset from Cainos pack first
-        Sprite tilesetSprite = BackgroundLoader.LoadGrassTileset();
-        
         // Create background texture (larger for better coverage)
         int textureSize = 1024;
         Texture2D bgTexture = new Texture2D(textureSize, textureSize);
@@ -98,6 +95,10 @@ public class BackgroundManager : MonoBehaviour
         }
         
         bgTexture.SetPixels(pixels);
+        
+        // Add dirt paths through the grass
+        AddDirtPaths(bgTexture, tileSize);
+        
         bgTexture.Apply();
         
         // Create sprite from texture
@@ -125,6 +126,79 @@ public class BackgroundManager : MonoBehaviour
         }
         
         DebugLog.Info($"[BackgroundManager] Created procedural grass background ({textureSize}x{textureSize}, {tilesPerSide}x{tilesPerSide} tiles)");
+    }
+    
+    /// <summary>
+    /// Add winding dirt paths through the grass using Perlin noise
+    /// </summary>
+    private void AddDirtPaths(Texture2D texture, int tileSize)
+    {
+        int width = texture.width;
+        int height = texture.height;
+        
+        Color dirtColor = new Color(0.45f, 0.35f, 0.25f); // Brown dirt
+        Color dirtDark = new Color(0.35f, 0.25f, 0.18f); // Darker dirt for edges
+        int pathWidth = 48; // pixels (about 1.5 tiles)
+        
+        // Create horizontal winding path
+        for (int x = 0; x < width; x++)
+        {
+            // Use Perlin noise for organic path variation
+            float noiseValue = Mathf.PerlinNoise(x * 0.02f, 0.5f);
+            int centerY = Mathf.RoundToInt(noiseValue * height * 0.6f + height * 0.2f); // Path through middle-ish area
+            
+            for (int y = centerY - pathWidth/2; y < centerY + pathWidth/2; y++)
+            {
+                if (y >= 0 && y < height)
+                {
+                    // Distance from path center for blending
+                    float distFromCenter = Mathf.Abs(y - centerY) / (pathWidth * 0.5f);
+                    
+                    // Add small pebbles/texture
+                    float pebbleNoise = Mathf.PerlinNoise(x * 0.1f, y * 0.1f);
+                    Color dirtVariation = Color.Lerp(dirtDark, dirtColor, pebbleNoise);
+                    
+                    // Random small stones
+                    if (Random.value < 0.02f) // 2% chance per pixel
+                    {
+                        dirtVariation = new Color(0.6f, 0.55f, 0.5f); // Light grey pebble
+                    }
+                    
+                    // Blend with grass at edges for smooth transition
+                    Color grassPixel = texture.GetPixel(x, y);
+                    Color finalColor = Color.Lerp(dirtVariation, grassPixel, distFromCenter * distFromCenter);
+                    texture.SetPixel(x, y, finalColor);
+                }
+            }
+        }
+        
+        // Create vertical winding path
+        for (int y = 0; y < height; y++)
+        {
+            // Different Perlin noise seed for different path
+            float noiseValue = Mathf.PerlinNoise(0.3f, y * 0.02f);
+            int centerX = Mathf.RoundToInt(noiseValue * width * 0.6f + width * 0.2f);
+            
+            for (int x = centerX - pathWidth/2; x < centerX + pathWidth/2; x++)
+            {
+                if (x >= 0 && x < width)
+                {
+                    float distFromCenter = Mathf.Abs(x - centerX) / (pathWidth * 0.5f);
+                    
+                    float pebbleNoise = Mathf.PerlinNoise(x * 0.1f, y * 0.1f);
+                    Color dirtVariation = Color.Lerp(dirtDark, dirtColor, pebbleNoise);
+                    
+                    if (Random.value < 0.02f)
+                    {
+                        dirtVariation = new Color(0.6f, 0.55f, 0.5f);
+                    }
+                    
+                    Color grassPixel = texture.GetPixel(x, y);
+                    Color finalColor = Color.Lerp(dirtVariation, grassPixel, distFromCenter * distFromCenter);
+                    texture.SetPixel(x, y, finalColor);
+                }
+            }
+        }
     }
     
     /// <summary>

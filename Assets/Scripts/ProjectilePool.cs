@@ -41,6 +41,7 @@ public class ProjectilePool : ObjectPool<Projectile>
         if (sr == null)
             sr = go.AddComponent<SpriteRenderer>();
         sr.sprite = SpriteLoader.LoadProjectileSprite("fireball");
+        sr.sortingOrder = 15; // Above rocks (10) and below damage numbers (100)
         go.transform.localScale = Vector3.one * 1.5f; // Larger projectiles
         
         projectile.Deactivate();

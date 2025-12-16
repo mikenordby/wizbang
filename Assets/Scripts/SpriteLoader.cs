@@ -70,6 +70,31 @@ public static class SpriteLoader
     }
     
     /// <summary>
+    /// Load knight sprite with procedural fallback
+    /// </summary>
+    public static Sprite LoadKnightSprite()
+    {
+        Sprite sprite = LoadSprite("Player/knight");
+        
+        // Fallback to procedural generation if asset not found
+        if (sprite == null && useProceduralFallback)
+        {
+            DebugLog.Info("[SpriteLoader] Using procedural knight sprite as fallback");
+            sprite = SpriteGenerator.CreateKnightSprite();
+            if (sprite != null)
+            {
+                DebugLog.Info($"[SpriteLoader] Generated knight sprite: {sprite.texture.width}x{sprite.texture.height}px, PPU={sprite.pixelsPerUnit}");
+            }
+        }
+        else if (sprite != null)
+        {
+            DebugLog.Info($"[SpriteLoader] Loaded knight sprite from Resources: {sprite.texture.width}x{sprite.texture.height}px, PPU={sprite.pixelsPerUnit}");
+        }
+        
+        return sprite;
+    }
+    
+    /// <summary>
     /// Load enemy sprite with procedural fallback
     /// </summary>
     public static Sprite LoadEnemySprite(string enemyName, Color color)
@@ -83,12 +108,19 @@ public static class SpriteLoader
         {
             DebugLog.Info($"[SpriteLoader] Using procedural {enemyName} sprite as fallback");
             
-            if (enemyName.ToLower().Contains("blob") || enemyName.ToLower().Contains("slime"))
-                sprite = SpriteGenerator.CreateBlobSprite(color);
-            else if (enemyName.ToLower().Contains("skeleton"))
+            string lowerName = enemyName.ToLower();
+            if (lowerName.Contains("goblin"))
+                sprite = SpriteGenerator.CreateGoblinSprite(color);
+            else if (lowerName.Contains("skeleton"))
                 sprite = SpriteGenerator.CreateSkeletonSprite(color);
+            else if (lowerName.Contains("ogre"))
+                sprite = SpriteGenerator.CreateOgreSprite(color);
+            else if (lowerName.Contains("dragon"))
+                sprite = SpriteGenerator.CreateDragonSprite(color);
+            else if (lowerName.Contains("blob") || lowerName.Contains("slime"))
+                sprite = SpriteGenerator.CreateGoblinSprite(color); // Redirect blob to goblin
             else
-                sprite = SpriteGenerator.CreateBlobSprite(color); // Default fallback
+                sprite = SpriteGenerator.CreateGoblinSprite(color); // Default fallback
             
             if (sprite != null)
             {

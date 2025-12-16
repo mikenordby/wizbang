@@ -50,6 +50,27 @@ public class DamageNumber : MonoBehaviour
         gameObject.SetActive(true);
     }
     
+    /// <summary>
+    /// Show damage number with custom color (for player damage)
+    /// </summary>
+    public void ShowCustom(Vector3 position, float damage, Color color, bool isCrit = false)
+    {
+        transform.position = position;
+        timer = lifetime;
+        
+        // Set text
+        textMesh.text = damage.ToString("F0");
+        
+        // Set custom color
+        startColor = color;
+        textMesh.color = startColor;
+        
+        // Make 1.5x larger if crit
+        textMesh.fontSize = isCrit ? 4.5f : 3f;
+        
+        gameObject.SetActive(true);
+    }
+    
     private void Update()
     {
         if (GameState.IsPaused) return;

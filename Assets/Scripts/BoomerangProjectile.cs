@@ -22,8 +22,8 @@ public class BoomerangProjectile : BaseProjectile, ICollidable
     public override float CollisionRadius => 0.3f; // Boomerang arc blade
     
     // ICollidable implementation
-    public Vector3 Position => transform.position;
-    public CollisionLayer Layer => CollisionLayer.Projectile;
+    public new Vector3 Position => transform.position;
+    public override CollisionLayer Layer => CollisionLayer.Projectile;
     
     /// <summary>
     /// Activate boomerang with throw direction

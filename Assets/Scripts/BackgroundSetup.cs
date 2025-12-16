@@ -15,39 +15,70 @@ public class BackgroundSetup : MonoBehaviour
     
     private void Start()
     {
+        PersistentLogger.Separator("BACKGROUND SETUP START");
+        PersistentLogger.Info($"Start() called on {gameObject.name}, autoSetupOnStart={autoSetupOnStart}", "BackgroundSetup");
+        Debug.Log($"[BackgroundSetup] Start() called on {gameObject.name}, autoSetupOnStart={autoSetupOnStart}");
+        DebugLog.Info($"[BackgroundSetup] Start() called on {gameObject.name}, autoSetupOnStart={autoSetupOnStart}");
+        
         if (autoSetupOnStart)
         {
             SetupBackground();
+        }
+        else
+        {
+            PersistentLogger.Warning("autoSetupOnStart is FALSE, background will not be created", "BackgroundSetup");
+            Debug.LogWarning("[BackgroundSetup] autoSetupOnStart is FALSE, background will not be created");
+            DebugLog.Warning("[BackgroundSetup] autoSetupOnStart is FALSE, background will not be created");
         }
     }
     
     [ContextMenu("Setup Background Now")]
     public void SetupBackground()
     {
+        PersistentLogger.Info("SetupBackground() called", "BackgroundSetup");
+        Debug.Log("[BackgroundSetup] SetupBackground() called");
+        DebugLog.Info("[BackgroundSetup] SetupBackground() called");
+        
         // Check if BackgroundManager already exists
         BackgroundManager existing = FindAnyObjectByType<BackgroundManager>();
         if (existing != null)
         {
-            Debug.Log("[BackgroundSetup] BackgroundManager already exists, skipping setup");
+            DebugLog.Warning($"[BackgroundSetup] BackgroundManager already exists on {existing.gameObject.name}, skipping setup");
             return;
         }
+        
+        DebugLog.Info("[BackgroundSetup] Creating new BackgroundManager...");
         
         // Create BackgroundManager GameObject
         GameObject bgManagerObj = new GameObject("BackgroundManager");
         BackgroundManager bgManager = bgManagerObj.AddComponent<BackgroundManager>();
         
+        DebugLog.Info($"[BackgroundSetup] Created BackgroundManager on GameObject: {bgManagerObj.name}");
+        
         // Set camera reference
         Camera mainCam = Camera.main;
         if (mainCam != null)
         {
+            DebugLog.Info($"[BackgroundSetup] Found Camera.main: {mainCam.name}");
+            
             // Use reflection to set the private mainCamera field
             var field = typeof(BackgroundManager).GetField("mainCamera", 
                 System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
             if (field != null)
+            {
                 field.SetValue(bgManager, mainCam);
+                DebugLog.Info("[BackgroundSetup] Successfully set mainCamera field via reflection");
+            }
+            else
+            {
+                DebugLog.Error("[BackgroundSetup] Failed to find mainCamera field via reflection!");
+            }
+        }
+        else
+        {
+            DebugLog.Error("[BackgroundSetup] Camera.main is NULL!");
         }
         
-        Debug.Log("[BackgroundSetup] Background created successfully! Background will generate on scene start.");
-        Debug.Log("[BackgroundSetup] To use Cainos grass tileset, copy TX Tileset Grass.png to Assets/Resources/Backgrounds/grass_tileset.png");
+        DebugLog.Info("[BackgroundSetup] Background setup complete! BackgroundManager will initialize on its Start()");
     }
 }

@@ -12,10 +12,10 @@ public class RockSpawner : MonoBehaviour
     [SerializeField] private Transform player;
     
     [Tooltip("Number of rocks per chunk (10x10 unit area)")]
-    [SerializeField] private int rocksPerChunk = 2; // Low density = sparse placement
+    [SerializeField] private int rocksPerChunk = 1; // Very low density = sparse placement
     
     [Tooltip("Size of each chunk in world units")]
-    [SerializeField] private int chunkSize = 10;
+    [SerializeField] private int chunkSize = 20;
     
     [Tooltip("How far from player before despawning")]
     [SerializeField] private float despawnDistance = 35f;

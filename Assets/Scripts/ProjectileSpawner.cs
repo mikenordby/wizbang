@@ -3,9 +3,11 @@ using System.Collections.Generic;
 
 /// <summary>
 /// Auto-shoots projectiles at nearest enemy
+/// NOTE: Currently disabled to prevent auto-firing. Individual weapons handle their own projectiles.
 /// </summary>
 public class ProjectileSpawner : MonoBehaviour
 {
+    [SerializeField] private bool enableAutoFire = false; // Disabled by default
     [SerializeField] private Transform playerTransform;
     [SerializeField] private ProjectilePool projectilePool;
     [SerializeField] private EnemyPool enemyPool;
@@ -15,6 +17,7 @@ public class ProjectileSpawner : MonoBehaviour
     
     private void Update()
     {
+        if (!enableAutoFire) return; // Disabled - weapons fire their own projectiles
         if (GameState.IsPaused) return;
         
         timeSinceLastShot += Time.deltaTime;

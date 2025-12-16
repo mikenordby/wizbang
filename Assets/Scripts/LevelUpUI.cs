@@ -3,7 +3,7 @@ using UnityEngine.UI;
 using System.Collections.Generic;
 
 /// <summary>
-/// Manages the level-up UI with weapon upgrade choices
+/// Manages the level-up UI with upgrade choices (weapons, upgrades, stats)
 /// </summary>
 public class LevelUpUI : MonoBehaviour
 {
@@ -11,17 +11,31 @@ public class LevelUpUI : MonoBehaviour
     
     private GameObject levelUpPanel;
     private Text levelText;
+    private Button rerollButton;
+    private Text rerollText;
     private List<Button> upgradeButtons = new List<Button>();
-    private List<(Weapon weapon, WeaponUpgrade.UpgradeType upgradeType)> currentChoices = new List<(Weapon, WeaponUpgrade.UpgradeType)>();
+    private List<UpgradeChoice> currentChoices = new List<UpgradeChoice>();
     
-    private WeaponInventory weaponInventory;
+    private UpgradeChoiceGenerator choiceGenerator;
+    private Player player;
     
     public bool IsShowingUI => levelUpPanel != null && levelUpPanel.activeSelf;
     
     private void Awake()
     {
         instance = this;
-        weaponInventory = FindAnyObjectByType<WeaponInventory>();
+        player = FindFirstObjectByType<Player>();
+        
+        if (player != null)
+        {
+            choiceGenerator = player.GetComponent<UpgradeChoiceGenerator>();
+            if (choiceGenerator == null)
+            {
+                choiceGenerator = player.gameObject.AddComponent<UpgradeChoiceGenerator>();
+                DebugLog.Info("[LevelUpUI] Created UpgradeChoiceGenerator on Player");
+            }
+        }
+        
         CreateUI();
         HideUI();
     }
@@ -91,16 +105,16 @@ public class LevelUpUI : MonoBehaviour
             RectTransform buttonRect = buttonObj.GetComponent<RectTransform>();
             buttonRect.anchorMin = new Vector2(0.5f, 0.5f);
             buttonRect.anchorMax = new Vector2(0.5f, 0.5f);
-            buttonRect.sizeDelta = new Vector2(240, 180);
+            buttonRect.sizeDelta = new Vector2(240, 220);
             buttonRect.anchoredPosition = new Vector2(buttonXPositions[i], 0);
             
-            // Button text (weapon name + upgrade description)
+            // Button text (category + name + description)
             GameObject buttonTextObj = new GameObject("Text");
             buttonTextObj.transform.SetParent(buttonObj.transform, false);
             Text buttonText = buttonTextObj.AddComponent<Text>();
             buttonText.text = "Upgrade Option";
             buttonText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            buttonText.fontSize = 18;
+            buttonText.fontSize = 16;
             buttonText.alignment = TextAnchor.MiddleCenter;
             buttonText.color = Color.white;
             
@@ -114,134 +128,130 @@ public class LevelUpUI : MonoBehaviour
             button.onClick.AddListener(() => OnUpgradeChosen(buttonIndex));
         }
         
-        DebugLog.Info("LevelUpUI: UI created with 3 upgrade choices");
+        // Create reroll button
+        GameObject rerollBtnObj = new GameObject("RerollButton");
+        rerollBtnObj.transform.SetParent(levelUpPanel.transform, false);
+        rerollButton = rerollBtnObj.AddComponent<Button>();
+        
+        Image rerollImage = rerollBtnObj.AddComponent<Image>();
+        rerollImage.color = new Color(0.8f, 0.4f, 0.2f); // Orange
+        
+        RectTransform rerollRect = rerollBtnObj.GetComponent<RectTransform>();
+        rerollRect.anchorMin = new Vector2(0.5f, 0.25f);
+        rerollRect.anchorMax = new Vector2(0.5f, 0.25f);
+        rerollRect.sizeDelta = new Vector2(200, 50);
+        rerollRect.anchoredPosition = Vector2.zero;
+        
+        // Reroll button text
+        GameObject rerollTextObj = new GameObject("Text");
+        rerollTextObj.transform.SetParent(rerollBtnObj.transform, false);
+        rerollText = rerollTextObj.AddComponent<Text>();
+        rerollText.text = "Reroll (1 left)";
+        rerollText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        rerollText.fontSize = 20;
+        rerollText.alignment = TextAnchor.MiddleCenter;
+        rerollText.color = Color.white;
+        
+        RectTransform rerollTextRect = rerollTextObj.GetComponent<RectTransform>();
+        rerollTextRect.anchorMin = Vector2.zero;
+        rerollTextRect.anchorMax = Vector2.one;
+        rerollTextRect.sizeDelta = Vector2.zero;
+        
+        rerollButton.onClick.AddListener(OnRerollClicked);
+        
+        DebugLog.Info("LevelUpUI: UI created with 3 upgrade choices and reroll button");
     }
     
     public void ShowUI(int newLevel)
     {
-        if (weaponInventory == null)
+        if (choiceGenerator == null)
         {
-            weaponInventory = FindAnyObjectByType<WeaponInventory>();
-            if (weaponInventory == null)
-            {
-                DebugLog.Warning("[LevelUpUI] WeaponInventory not found in scene, creating new one");
-                GameObject inventoryObj = new GameObject("WeaponInventory");
-                weaponInventory = inventoryObj.AddComponent<WeaponInventory>();
-            }
+            DebugLog.Error("[LevelUpUI] UpgradeChoiceGenerator not found!");
+            return;
         }
         
         levelUpPanel.SetActive(true);
         levelText.text = $"LEVEL {newLevel}!";
         
-        // Generate choices with special logic for level 2
-        GenerateUpgradeChoices(newLevel);
+        // Generate choices using new system
+        currentChoices = choiceGenerator.GenerateChoices();
         
-        GameState.SetPaused(true);
-        DebugLog.Info($"LevelUpUI: Showing UI for level {newLevel}");
+        DisplayChoices();
     }
     
-    private void GenerateUpgradeChoices(int currentLevel)
+    /// <summary>
+    /// Show UI for treasure chest (displays "TREASURE!" instead of level)
+    /// </summary>
+    public void ShowChestReward(int currentLevel)
     {
-        currentChoices.Clear();
-        List<Weapon> weapons = weaponInventory.GetActiveWeapons();
-        
-        // Level 2: Guarantee Orbiter Weapon as one of the choices
-        if (currentLevel == 2)
+        if (choiceGenerator == null)
         {
-            bool hasOrbiter = weapons.Exists(w => w is OrbiterWeapon);
-            if (!hasOrbiter)
-            {
-                // First choice: Add Orbiter Weapon
-                currentChoices.Add((null, WeaponUpgrade.UpgradeType.Damage)); // Special marker for "new weapon"
-                upgradeButtons[0].GetComponentInChildren<Text>().text = "Unlock\n\nOrbiting Blades\nSpinning knives that protect you";
-                
-                // Remaining 2 choices: Upgrade existing weapons
-                for (int i = 1; i < 3; i++)
-                {
-                    AddRandomUpgradeChoice(weapons, i);
-                }
-                
-                DebugLog.Info("[LevelUpUI] Level 2: Guaranteed Orbiter Weapon unlock");
-                return;
-            }
+            DebugLog.Error("[LevelUpUI] UpgradeChoiceGenerator not found!");
+            return;
         }
         
-        // Level 3: Guarantee Boomerang Weapon as one of the choices
-        if (currentLevel == 3)
-        {
-            bool hasBoomerang = weapons.Exists(w => w is BoomerangWeapon);
-            if (!hasBoomerang)
-            {
-                // First choice: Add Boomerang Weapon
-                currentChoices.Add((null, WeaponUpgrade.UpgradeType.ProjectileCount)); // Special marker for "new weapon"
-                upgradeButtons[0].GetComponentInChildren<Text>().text = "Unlock\n\nBoomerang\nThrows arcing projectiles that hit multiple enemies";
-                
-                // Remaining 2 choices: Upgrade existing weapons
-                for (int i = 1; i < 3; i++)
-                {
-                    AddRandomUpgradeChoice(weapons, i);
-                }
-                
-                DebugLog.Info("[LevelUpUI] Level 3: Guaranteed Boomerang Weapon unlock");
-                return;
-            }
-        }
+        levelUpPanel.SetActive(true);
+        levelText.text = "TREASURE!";
+        levelText.color = new Color(1f, 0.84f, 0f); // Gold color
         
-        // Level 4: Guarantee Rapid Fire Weapon as one of the choices
-        if (currentLevel == 4)
-        {
-            bool hasRapidFire = weapons.Exists(w => w is RapidFireWeapon);
-            if (!hasRapidFire)
-            {
-                // First choice: Add Rapid Fire Weapon
-                currentChoices.Add((null, WeaponUpgrade.UpgradeType.FireRate)); // Special marker for "new weapon"
-                upgradeButtons[0].GetComponentInChildren<Text>().text = "Unlock\n\nRapid Fire Pistol\nLow damage, HIGH fire rate. Spray and pray!";
-                
-                // Remaining 2 choices: Upgrade existing weapons
-                for (int i = 1; i < 3; i++)
-                {
-                    AddRandomUpgradeChoice(weapons, i);
-                }
-                
-                DebugLog.Info("[LevelUpUI] Level 4: Guaranteed Rapid Fire Weapon unlock");
-                return;
-            }
-        }
+        // Generate choices using new system
+        currentChoices = choiceGenerator.GenerateChoices();
         
-        // Normal upgrade choices
-        if (weapons.Count == 0)
+        DisplayChoices();
+    }
+    
+    private void DisplayChoices()
+    {
+        if (currentChoices.Count == 0)
         {
-            DebugLog.Warning("[LevelUpUI] No weapons available for upgrades! Closing UI.");
+            DebugLog.Warning("[LevelUpUI] No upgrade choices available!");
             HideUI();
             return;
         }
         
-        for (int i = 0; i < 3; i++)
+        // Update buttons with choices
+        for (int i = 0; i < upgradeButtons.Count; i++)
         {
-            AddRandomUpgradeChoice(weapons, i);
+            if (i < currentChoices.Count)
+            {
+                UpgradeChoice choice = currentChoices[i];
+                
+                // Color code by category
+                Color categoryColor = choice.Type switch
+                {
+                    UpgradeChoice.ChoiceType.NewWeapon => new Color(1f, 0.3f, 0.3f), // Red
+                    UpgradeChoice.ChoiceType.WeaponUpgrade => new Color(0.3f, 0.8f, 1f), // Cyan
+                    UpgradeChoice.ChoiceType.PlayerStat => new Color(0.4f, 1f, 0.4f), // Green
+                    _ => Color.white
+                };
+                
+                upgradeButtons[i].GetComponent<Image>().color = categoryColor;
+                
+                // Format text: Category badge + name + description
+                string categoryLabel = choice.Type switch
+                {
+                    UpgradeChoice.ChoiceType.NewWeapon => "[NEW WEAPON]",
+                    UpgradeChoice.ChoiceType.WeaponUpgrade => "[UPGRADE]",
+                    UpgradeChoice.ChoiceType.PlayerStat => "[STAT]",
+                    _ => ""
+                };
+                
+                upgradeButtons[i].GetComponentInChildren<Text>().text = 
+                    $"{categoryLabel}\n\n{choice.DisplayName}\n\n{choice.Description}";
+                
+                upgradeButtons[i].gameObject.SetActive(true);
+            }
+            else
+            {
+                upgradeButtons[i].gameObject.SetActive(false);
+            }
         }
-    }
-    
-    private void AddRandomUpgradeChoice(List<Weapon> weapons, int buttonIndex)
-    {
-        if (weapons.Count == 0) return;
         
-        Weapon randomWeapon = weapons[Random.Range(0, weapons.Count)];
-        List<WeaponUpgrade> availableUpgrades = randomWeapon.GetAvailableUpgrades();
+        // Update reroll button
+        UpdateRerollButton();
         
-        if (availableUpgrades.Count == 0)
-        {
-            DebugLog.Warning($"[LevelUpUI] {randomWeapon.WeaponName} has no available upgrades!");
-            return;
-        }
-        
-        WeaponUpgrade randomUpgrade = availableUpgrades[Random.Range(0, availableUpgrades.Count)];
-        currentChoices.Add((randomWeapon, randomUpgrade.type));
-        
-        string weaponName = randomWeapon.WeaponName;
-        string upgradeName = randomUpgrade.type.ToString();
-        string upgradePreview = randomUpgrade.GetNextLevelPreview();
-        upgradeButtons[buttonIndex].GetComponentInChildren<Text>().text = $"{weaponName}\n\n{upgradeName}\n{upgradePreview}";
+        GameState.SetPaused(true);
+        DebugLog.Info($"[LevelUpUI] Showing {currentChoices.Count} upgrade choices");
     }
     
     private void OnUpgradeChosen(int index)
@@ -252,49 +262,44 @@ public class LevelUpUI : MonoBehaviour
             return;
         }
         
-        var (weapon, upgradeType) = currentChoices[index];
-        int currentLevel = weaponInventory.GetComponent<Player>().CurrentLevel;
+        UpgradeChoice choice = currentChoices[index];
         
-        // Special case: New weapon unlocks
-        if (weapon == null && index == 0)
-        {
-            bool success = false;
-            
-            // Level 2: Orbiter unlock
-            if (currentLevel == 2)
-            {
-                success = weaponInventory.AddWeapon("OrbiterWeapon");
-                if (success)
-                {
-                    DebugLog.Info("[LevelUpUI] Unlocked Orbiting Blades weapon!");
-                }
-            }
-            // Level 3: Boomerang unlock
-            else if (currentLevel == 3)
-            {
-                success = weaponInventory.AddWeapon("BoomerangWeapon");
-                if (success)
-                {
-                    DebugLog.Info("[LevelUpUI] Unlocked Boomerang weapon!");
-                }
-            }
-            // Level 4: Rapid Fire unlock
-            else if (currentLevel == 4)
-            {
-                success = weaponInventory.AddWeapon("RapidFireWeapon");
-                if (success)
-                {
-                    DebugLog.Info("[LevelUpUI] Unlocked Rapid Fire Pistol weapon!");
-                }
-            }
-        }
-        else if (weapon != null)
-        {
-            weapon.ApplyUpgrade(upgradeType);
-            DebugLog.Info($"[LevelUpUI] Chose upgrade: {weapon.WeaponName} - {upgradeType}");
-        }
+        // Apply the upgrade via ChoiceGenerator
+        choiceGenerator.ApplyChoice(choice);
+        
+        DebugLog.Info($"[LevelUpUI] Player selected: {choice.DisplayName} ({choice.Type})");
         
         HideUI();
+    }
+    
+    private void OnRerollClicked()
+    {
+        if (!choiceGenerator.CanReroll())
+        {
+            DebugLog.Warning("[LevelUpUI] No rerolls remaining!");
+            return;
+        }
+        
+        choiceGenerator.UseReroll();
+        DebugLog.Info("[LevelUpUI] Rerolling upgrade choices...");
+        
+        // Regenerate choices
+        ShowUI(player.CurrentLevel);
+    }
+    
+    private void UpdateRerollButton()
+    {
+        if (rerollButton == null) return;
+        
+        bool canReroll = choiceGenerator.CanReroll();
+        rerollButton.interactable = canReroll;
+        
+        if (rerollText != null)
+        {
+            int remaining = choiceGenerator.GetRemainingRerolls();
+            rerollText.text = canReroll ? $"Reroll ({remaining} left)" : "No Rerolls";
+            rerollText.color = canReroll ? Color.white : new Color(0.5f, 0.5f, 0.5f);
+        }
     }
     
     public void HideUI()

@@ -6,10 +6,22 @@ using System.Collections.Generic;
 /// </summary>
 public class DamageNumberPool : MonoBehaviour
 {
+    public static DamageNumberPool Instance { get; private set; }
+    
     [SerializeField] private int poolSize = 20;
     
     private List<DamageNumber> pool = new List<DamageNumber>();
     private int nextIndex = 0;
+    
+    private void Awake()
+    {
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+        Instance = this;
+    }
     
     private void Start()
     {
@@ -45,5 +57,17 @@ public class DamageNumberPool : MonoBehaviour
     public void ShowCriticalDamage(Vector3 position, float damage)
     {
         ShowDamage(position, damage, isCrit: true);
+    }
+    
+    /// <summary>
+    /// Show red damage numbers when player takes damage
+    /// </summary>
+    public void ShowPlayerDamage(Vector3 position, float damage)
+    {
+        DamageNumber damageNumber = pool[nextIndex];
+        nextIndex = (nextIndex + 1) % poolSize;
+        
+        // Show the damage number with red color
+        damageNumber.ShowCustom(position, damage, Color.red, false);
     }
 }

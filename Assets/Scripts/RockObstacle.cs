@@ -6,7 +6,6 @@ using UnityEngine;
 /// </summary>
 public class RockObstacle : MonoBehaviour
 {
-    [SerializeField] private float size = 1f;
     private SpriteRenderer spriteRenderer;
     private CircleCollider2D obstacleCollider;
     

@@ -88,4 +88,14 @@ private void Update()
         float effectiveSpeed = moveSpeed * (player != null ? player.MoveSpeedMultiplier : 1f);
         rb.linearVelocity = moveInput * effectiveSpeed;
     }
+    
+    /// <summary>
+    /// Set base move speed modifier (called by Player during character initialization)
+    /// </summary>
+    public void SetMoveSpeedModifier(float modifier)
+    {
+        // This is already handled by Player.MoveSpeedMultiplier
+        // This method exists for explicit initialization calls if needed
+        DebugLog.Info($"[PlayerMovement] Move speed modifier set to {modifier:F2}x (applied via Player.MoveSpeedMultiplier)");
+    }
 }

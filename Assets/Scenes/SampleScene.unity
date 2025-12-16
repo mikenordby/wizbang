@@ -173,6 +173,7 @@ GameObject:
   m_Component:
   - component: {fileID: 58751098}
   - component: {fileID: 58751099}
+  - component: {fileID: 58751100}
   m_Layer: 0
   m_Name: Background
   m_TagString: Untagged
@@ -204,14 +205,82 @@ MonoBehaviour:
   m_GameObject: {fileID: 58751096}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f1b96f0af61a69f498203f3f89bd5b49, type: 3}
+  m_Script: {fileID: 11500000, guid: 3b5c8e3e3b9d45f4a8c8b3b3b3b3b3b3, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::GrassBackground
-  gridWidth: 100
-  gridHeight: 100
-  tileSize: 1
-  grassColor1: {r: 0.2, g: 0.5, b: 0.2, a: 1}
-  grassColor2: {r: 0.25, g: 0.55, b: 0.25, a: 1}
+  m_EditorClassIdentifier: Assembly-CSharp::BackgroundSetup
+  autoSetupOnStart: 1
+  grassColor1:
+    r: 0.4
+    g: 0.7
+    b: 0.3
+    a: 1
+  grassColor2:
+    r: 0.35
+    g: 0.6
+    b: 0.25
+    a: 1
+--- !u!114 &58751100
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 58751096}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3369935bff8d252419c3f60e874a5c8e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BackgroundSetup
+  autoSetupOnStart: 1
+  grassColor1: {r: 0.4, g: 0.7, b: 0.3, a: 1}
+  grassColor2: {r: 0.35, g: 0.6, b: 0.25, a: 1}
+--- !u!1 &104577935
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 104577937}
+  - component: {fileID: 104577936}
+  m_Layer: 0
+  m_Name: BackgroundController
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &104577936
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 104577935}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3369935bff8d252419c3f60e874a5c8e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BackgroundSetup
+  autoSetupOnStart: 1
+  grassColor1: {r: 0.4, g: 0.7, b: 0.3, a: 1}
+  grassColor2: {r: 0.35, g: 0.6, b: 0.25, a: 1}
+--- !u!4 &104577937
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 104577935}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &151787315
 GameObject:
   m_ObjectHideFlags: 0
@@ -336,6 +405,55 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &200931183
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 200931185}
+  - component: {fileID: 200931184}
+  m_Layer: 0
+  m_Name: RockSpawner
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &200931184
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 200931183}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2e5af08523b9ef24eb19f7920fed879d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RockSpawner
+  player: {fileID: 0}
+  rocksPerChunk: 1
+  chunkSize: 10
+  despawnDistance: 35
+  rockSize: 0.6
+--- !u!4 &200931185
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 200931183}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &519420028
 GameObject:
   m_ObjectHideFlags: 0
@@ -418,7 +536,7 @@ Camera:
   m_Enabled: 1
   serializedVersion: 2
   m_ClearFlags: 2
-  m_BackGroundColor: {r: 0.19215687, g: 0.3019608, b: 0.4745098, a: 0}
+  m_BackGroundColor: {r: 0, g: 0, b: 0, a: 0}
   m_projectionMatrixMode: 1
   m_GateFitMode: 2
   m_FOVAxisMode: 0
@@ -969,6 +1087,50 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1289539157
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1289539159}
+  - component: {fileID: 1289539158}
+  m_Layer: 0
+  m_Name: DamageCalculator
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1289539158
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1289539157}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 74154160dbfa69841ab1ba408001883d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DamageCalculator
+--- !u!4 &1289539159
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1289539157}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1414351059
 GameObject:
   m_ObjectHideFlags: 0
@@ -1119,6 +1281,8 @@ MonoBehaviour:
   enemyTypes:
   - {fileID: 11400000, guid: ed67655f0b1b18245930c58b92672f8a, type: 2}
   - {fileID: 11400000, guid: acfa019ee5d1a31449354f6ae81f2910, type: 2}
+  - {fileID: 11400000, guid: 3e1cb1e47c23d0f41827fc74a969700e, type: 2}
+  - {fileID: 11400000, guid: 3f47c5714b38a5045b6c485a0416d27d, type: 2}
 --- !u!114 &1508885881
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1133,7 +1297,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::EnemySpawner
   baseSpawnInterval: 0.5
   minSpawnInterval: 0.1
-  spawnRateIncreasePerMinute: 0.1
   spawnDistanceFromCamera: 12
   enemyPool: {fileID: 1508885880}
   player: {fileID: 1104301249}
@@ -1184,7 +1347,6 @@ MonoBehaviour:
   enemyPool: {fileID: 1508885880}
   orbiterManager: {fileID: 0}
   playerCollisionRadius: 0.25
-  projectileDamage: 10
   gridCellSize: 2
   showGridDebug: 0
 --- !u!114 &1508885885
@@ -1214,6 +1376,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0e09dc060c0c40d4686069980f6061e3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ProjectileSpawner
+  enableAutoFire: 0
   playerTransform: {fileID: 1104301249}
   projectilePool: {fileID: 1508885885}
   enemyPool: {fileID: 1508885880}
@@ -1231,7 +1394,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::OrbiterManager
   playerTransform: {fileID: 0}
-  maxOrbiters: 2
   orbitSpeed: 1
   orbitRadius: 2
   damage: 15
@@ -1249,6 +1411,144 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::XPOrbPool
   initialPoolSize: 50
   maxPoolSize: 200
+--- !u!1 &1587333947
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1587333948}
+  - component: {fileID: 1587333949}
+  m_Layer: 0
+  m_Name: Bootstrap
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1587333948
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1587333947}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1587333949
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1587333947}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 67860fb06dc425c4e9c64020a2bcc87f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GameBootstrap
+  enablePersistentLogging: 1
+--- !u!1 &1900000001
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1900000003}
+  - component: {fileID: 1900000002}
+  m_Layer: 0
+  m_Name: CharacterSelectionUI
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1900000002
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1900000001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7cd8f9c151f30af4faf37168b3416099, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CharacterSelectionUI
+  availableCharacters: []
+--- !u!4 &1900000003
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1900000001}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1900000004
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1900000006}
+  - component: {fileID: 1900000005}
+  m_Layer: 0
+  m_Name: TreasureChestSpawner
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1900000005
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1900000004}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 998a4dbc29d983748a65727d3ffbacd4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TreasureChestSpawner
+  player: {fileID: 1104301249}
+  chestSpawnChance: 0.05
+  chunkSize: 20
+  despawnDistance: 35
+--- !u!4 &1900000006
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1900000004}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &2129940002
 GameObject:
   m_ObjectHideFlags: 0
@@ -1283,6 +1583,7 @@ MonoBehaviour:
   orbitRadius: 2
   orbitSpeed: 2
   respawnDelay: 1
+  hitCooldown: 0.5
 --- !u!212 &2129940004
 SpriteRenderer:
   serializedVersion: 2
@@ -1374,3 +1675,9 @@ SceneRoots:
   - {fileID: 151787318}
   - {fileID: 1137520020}
   - {fileID: 176916468}
+  - {fileID: 200931185}
+  - {fileID: 1289539159}
+  - {fileID: 1900000003}
+  - {fileID: 1900000006}
+  - {fileID: 1587333948}
+  - {fileID: 104577937}

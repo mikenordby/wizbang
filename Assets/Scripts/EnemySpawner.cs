@@ -8,8 +8,7 @@ public class EnemySpawner : MonoBehaviour
 {
     [Header("Spawn Settings")]
     [SerializeField] private float baseSpawnInterval = 0.5f; // Starting: 2 per second
-    [SerializeField] private float minSpawnInterval = 0.1f; // Max: 10 per second
-    [SerializeField] private float spawnRateIncreasePerMinute = 0.1f; // Linear scaling
+    [SerializeField] private float minSpawnInterval = 0.05f; // Cap at 20 per second
     [SerializeField] private float spawnDistanceFromCamera = 12f; // Just outside view
     
     [Header("References")]
@@ -25,6 +24,8 @@ public class EnemySpawner : MonoBehaviour
     private float cleanupTimer;
     private float gameTime; // Track time for spawn rate scaling
     private float currentSpawnInterval;
+    private bool ogreUnlocked = false;
+    private bool dragonUnlocked = false;
     
     private void Start()
     {
@@ -52,10 +53,24 @@ public class EnemySpawner : MonoBehaviour
     {
         if (enemyPool == null || player == null || GameState.IsPaused) return;
         
-        // Track game time and scale spawn rate (linear increase)
+        // Track game time and scale spawn rate (doubles every minute)
         gameTime += Time.deltaTime;
+        
+        // Check for enemy unlocks
+        if (!ogreUnlocked && gameTime >= 30f)
+        {
+            ogreUnlocked = true;
+            DebugLog.Info("[EnemySpawner] Ogres are now spawning!");
+        }
+        if (!dragonUnlocked && gameTime >= 60f)
+        {
+            dragonUnlocked = true;
+            DebugLog.Info("[EnemySpawner] Dragons are now spawning!");
+        }
+        
         float minutesElapsed = gameTime / 60f;
-        currentSpawnInterval = Mathf.Max(minSpawnInterval, baseSpawnInterval - (spawnRateIncreasePerMinute * minutesElapsed));
+        float spawnMultiplier = Mathf.Pow(2f, minutesElapsed); // 1x, 2x, 4x, 8x...
+        currentSpawnInterval = Mathf.Max(minSpawnInterval, baseSpawnInterval / spawnMultiplier);
         
         spawnTimer -= Time.deltaTime;
         if (spawnTimer <= 0f)
@@ -76,11 +91,25 @@ public class EnemySpawner : MonoBehaviour
     {
         Vector3 spawnPosition = GetSpawnPositionOutsideView();
         
-        EnemyStats stats = enemyPool.GetRandomEnemyType();
+        EnemyStats stats = enemyPool.GetRandomEnemyType(gameTime);
         Enemy enemy = enemyPool.GetEnemy(stats);
         if (enemy != null && stats != null)
         {
-            enemy.Activate(spawnPosition, stats);
+            // Scale enemy health based on game time (doubles every minute)
+            float minutesElapsed = gameTime / 60f;
+            float healthMultiplier = Mathf.Pow(2f, minutesElapsed);
+            
+            // Create scaled stats (copy to avoid modifying the original asset)
+            EnemyStats scaledStats = ScriptableObject.CreateInstance<EnemyStats>();
+            scaledStats.enemyName = stats.enemyName;
+            scaledStats.maxHealth = stats.maxHealth * healthMultiplier;
+            scaledStats.moveSpeed = stats.moveSpeed;
+            scaledStats.contactDamage = stats.contactDamage;
+            scaledStats.xpDrop = stats.xpDrop;
+            scaledStats.color = stats.color;
+            scaledStats.scale = stats.scale;
+            
+            enemy.Activate(spawnPosition, scaledStats);
             DebugLog.Info($"Spawned {stats.enemyName} at {spawnPosition}, active: {enemyPool.GetActiveCount()}");
         }
         else

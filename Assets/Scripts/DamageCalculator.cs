@@ -28,6 +28,8 @@ public class DamageCalculator : MonoBehaviour
         float damage = context.baseDamage;
         bool isCrit = false;
         
+        DebugLog.Info($"[DamageCalculator] Input: baseDamage={context.baseDamage:F1}, playerMult={context.player?.DamageMultiplier:F2}, critChance={context.player?.CritChance:F2}");
+        
         // 1. Apply player damage multiplier
         if (context.player != null)
         {
@@ -41,6 +43,8 @@ public class DamageCalculator : MonoBehaviour
             isCrit = true;
             DebugLog.Verbose($"[DamageCalculator] CRITICAL HIT! Damage: {context.baseDamage:F1} → {damage:F1}");
         }
+        
+        DebugLog.Info($"[DamageCalculator] Output: finalDamage={damage:F1}, isCrit={isCrit}");
         
         // Future: Apply weapon-specific multipliers
         // if (context.damageType == DamageType.Fire && context.enemy.IsBurning)

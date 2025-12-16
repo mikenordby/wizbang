@@ -14,7 +14,7 @@ public class OrbiterWeapon : Weapon
         weaponName = "Orbiting Blades";
         baseDamage = 15f;
         baseFireRate = 0f; // Always active, no firing
-        projectileCount = 1; // Start with 1 orbiter, upgrades add more
+        projectileCount = 2; // Start with 2 orbiters (for knight)
         projectileSpeed = 0f; // Not used for orbiters (they orbit, not fly)
         projectileSize = 1.5f; // Larger spinning blades
         

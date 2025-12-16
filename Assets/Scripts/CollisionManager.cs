@@ -22,7 +22,7 @@ public class CollisionManager : MonoBehaviour
     [SerializeField] private bool showGridDebug = false;
     
     private float lastPlayerDamageTime = -999f;
-    private float playerDamageCooldown = 0.5f;
+    private float playerDamageCooldown = 0.1f; // Reduced from 0.5s - much shorter i-frames
     
     private bool gameOver = false;
     private Health playerHealth;
@@ -231,6 +231,11 @@ public class CollisionManager : MonoBehaviour
             {
                 if (entity is Enemy enemy && enemy.gameObject.activeInHierarchy && enemy.IsActive)
                 {
+                    // Check if this orbiter can hit this enemy (not on cooldown)
+                    int enemyInstanceID = enemy.GetInstanceID();
+                    if (!orbiter.CanHitEnemy(enemyInstanceID))
+                        continue;
+                    
                     float distance = Vector3.Distance(orbiter.Position, enemy.Position);
                     float combinedRadius = orbiter.CollisionRadius + enemy.CollisionRadius;
                     
@@ -268,11 +273,10 @@ public class CollisionManager : MonoBehaviour
                                 else
                                     damagePool.ShowDamage(enemy.Position, result.finalDamage);
                             }
+                            
+                            // Record hit to prevent double-hitting same enemy
+                            orbiter.RecordHit(enemyInstanceID);
                         }
-                        
-                        DebugLog.Verbose($"[ORBITER HIT] Deactivating orbiter for 2 seconds");
-                        orbiter.Deactivate();
-                        break;
                     }
                 }
             }
@@ -312,12 +316,27 @@ public class CollisionManager : MonoBehaviour
                     if (Time.time - lastPlayerDamageTime >= playerDamageCooldown)
                     {
                         float damage = enemy.ContactDamage;
-                        bool died = playerHealth.TakeDamage(damage);
+                        bool playerDied = playerHealth.TakeDamage(damage);
                         lastPlayerDamageTime = Time.time;
                         
                         DebugLog.Info($"Player hit by {enemy.name}! Took {damage} damage, HP: {playerHealth.CurrentHealth}/{playerHealth.MaxHealth}");
                         
-                        if (died)
+                        // Show red damage number above player
+                        DamageNumberPool damagePool = GameServices.DamageNumberPool;
+                        if (damagePool != null)
+                        {
+                            damagePool.ShowPlayerDamage(playerTransform.position + Vector3.up * 0.5f, damage);
+                        }
+                        
+                        // Kill the enemy that hit the player (balances reduced i-frames)
+                        Health enemyHealth = enemy.GetComponent<Health>();
+                        if (enemyHealth != null)
+                        {
+                            enemyHealth.TakeDamage(999999f); // Instant kill
+                            DebugLog.Info($"Enemy {enemy.name} killed after hitting player (suicide attack)");
+                        }
+                        
+                        if (playerDied)
                         {
                             DebugLog.Info("Player DIED!");
                             gameOver = true;

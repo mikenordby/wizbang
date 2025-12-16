@@ -13,9 +13,9 @@ MonoBehaviour:
   m_Name: SkeletonStats
   m_EditorClassIdentifier: Assembly-CSharp::EnemyStats
   enemyName: Skeleton
-  maxHealth: 8
+  maxHealth: 15
   contactDamage: 15
   moveSpeed: 2.5
   xpDrop: 3
   color: {r: 0.9, g: 0.9, b: 0.9, a: 1}
-  scale: 1
+  scale: 1.4

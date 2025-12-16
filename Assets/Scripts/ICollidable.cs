@@ -39,5 +39,6 @@ public enum CollisionLayer
     Enemy = 1 << 1,         // 2
     Projectile = 1 << 2,    // 4
     Orbiter = 1 << 3,       // 8
-    XPOrb = 1 << 4          // 16
+    XPOrb = 1 << 4,         // 16
+    Boomerang = 1 << 5      // 32
 }

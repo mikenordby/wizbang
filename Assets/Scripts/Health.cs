@@ -57,6 +57,16 @@ public class Health : MonoBehaviour, IDamageable
         
         DebugLog.Info($"[Health.TakeDamage] {gameObject.name} took {damage:F1} damage, HP: {currentHealth:F1}/{maxHealth:F1}");
         
+        // Show red damage number for player
+        if (gameObject.CompareTag("Player"))
+        {
+            DamageNumberPool damagePool = GameServices.DamageNumberPool;
+            if (damagePool != null)
+            {
+                damagePool.ShowPlayerDamage(transform.position, damage);
+            }
+        }
+        
         OnHealthChanged?.Invoke(currentHealth);
         
         // Start i-frame timer
@@ -83,6 +93,17 @@ public class Health : MonoBehaviour, IDamageable
     {
         currentHealth = Mathf.Min(currentHealth + amount, maxHealth);
         OnHealthChanged?.Invoke(currentHealth);
+    }
+    
+    /// <summary>
+    /// Increase maximum health (and heal to new max)
+    /// </summary>
+    public void IncreaseMaxHealth(float amount)
+    {
+        maxHealth += amount;
+        currentHealth += amount; // Also heal by the amount
+        OnHealthChanged?.Invoke(currentHealth);
+        DebugLog.Info($"[Health] Max health increased to {maxHealth}, current: {currentHealth}");
     }
     
     private void Update()

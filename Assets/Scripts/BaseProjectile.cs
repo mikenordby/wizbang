@@ -5,7 +5,7 @@ using System.Collections.Generic;
 /// Base class for all projectile types (straight, orbiter, homing, etc.)
 /// Contains common properties and lifecycle management
 /// </summary>
-public abstract class BaseProjectile : MonoBehaviour
+public abstract class BaseProjectile : MonoBehaviour, ICollidable
 {
     [SerializeField] protected float collisionRadius = 0.15f;
     
@@ -23,6 +23,10 @@ public abstract class BaseProjectile : MonoBehaviour
     public int Pierce => pierce;
     public int EnemiesHit => enemiesHit;
     public DamageType DamageType => damageType;
+    
+    // ICollidable implementation
+    public Vector3 Position => transform.position;
+    public abstract CollisionLayer Layer { get; }
     
     protected virtual void Awake()
     {

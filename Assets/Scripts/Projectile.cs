@@ -16,8 +16,8 @@ public class Projectile : BaseProjectile, ICollidable
     public override float CollisionRadius => 0.2f; // Knife tip: 64px sprite, blade is ~25px wide
     
     // ICollidable implementation
-    public Vector3 Position => transform.position;
-    public CollisionLayer Layer => CollisionLayer.Projectile;
+    public new Vector3 Position => transform.position;
+    public override CollisionLayer Layer => CollisionLayer.Projectile;
     
     /// <summary>
     /// Activate projectile with straight movement

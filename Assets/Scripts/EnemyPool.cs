@@ -86,6 +86,42 @@ public class EnemyPool : ObjectPool<Enemy>
         return enemyTypes[Random.Range(0, enemyTypes.Length)];
     }
     
+    /// <summary>
+    /// Get a random enemy type based on elapsed game time (unlocks stronger enemies over time)
+    /// </summary>
+    public EnemyStats GetRandomEnemyType(float gameTime)
+    {
+        if (enemyTypes == null || enemyTypes.Length == 0)
+        {
+            DebugLog.Error("No enemy types configured!");
+            return null;
+        }
+        
+        // Build list of available enemy types based on game time
+        List<EnemyStats> availableTypes = new List<EnemyStats>();
+        
+        foreach (EnemyStats stats in enemyTypes)
+        {
+            // Blob/Skeleton: Always available
+            // Ogre: Available after 30 seconds
+            // Dragon: Available after 60 seconds
+            if (stats.enemyName == "Ogre" && gameTime < 30f)
+                continue;
+            if (stats.enemyName == "Dragon" && gameTime < 60f)
+                continue;
+                
+            availableTypes.Add(stats);
+        }
+        
+        if (availableTypes.Count == 0)
+        {
+            // Fallback to any enemy
+            return enemyTypes[Random.Range(0, enemyTypes.Length)];
+        }
+        
+        return availableTypes[Random.Range(0, availableTypes.Count)];
+    }
+    
     protected override Enemy CreateNewItem()
     {
         GameObject enemyObj = Instantiate(enemyPrefab, poolParent);

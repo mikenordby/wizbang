@@ -21,8 +21,33 @@ public class BackgroundManager : MonoBehaviour
     
     private void Start()
     {
+        PersistentLogger.Separator("BACKGROUND MANAGER START");
+        PersistentLogger.Info("Start() called", "BackgroundManager");
+        Debug.Log("[BackgroundManager] Start() called");
+        DebugLog.Info("[BackgroundManager] Start() called");
+        
         if (mainCamera == null)
+        {
             mainCamera = Camera.main;
+            if (mainCamera != null)
+            {
+                PersistentLogger.Info($"Found Camera.main: {mainCamera.name}", "BackgroundManager");
+                Debug.Log($"[BackgroundManager] Found Camera.main: {mainCamera.name}");
+                DebugLog.Info($"[BackgroundManager] Found Camera.main: {mainCamera.name}");
+            }
+            else
+            {
+                PersistentLogger.Error("Camera.main is NULL!", "BackgroundManager");
+                Debug.LogError("[BackgroundManager] Camera.main is NULL!");
+                DebugLog.Error("[BackgroundManager] Camera.main is NULL!");
+            }
+        }
+        else
+        {
+            PersistentLogger.Info($"Using assigned camera: {mainCamera.name}", "BackgroundManager");
+            Debug.Log($"[BackgroundManager] Using assigned camera: {mainCamera.name}");
+            DebugLog.Info($"[BackgroundManager] Using assigned camera: {mainCamera.name}");
+        }
         
         InitializeBackground();
     }
@@ -32,21 +57,36 @@ public class BackgroundManager : MonoBehaviour
     /// </summary>
     private void InitializeBackground()
     {
-        if (isInitialized) return;
+        PersistentLogger.Info("InitializeBackground() called", "BackgroundManager");
+        Debug.Log("[BackgroundManager] InitializeBackground() called");
+        DebugLog.Info("[BackgroundManager] InitializeBackground() called");
+        
+        if (isInitialized)
+        {
+            DebugLog.Warning("[BackgroundManager] Already initialized, skipping");
+            return;
+        }
         
         // Try to find existing tilemap
         tilemap = GetComponentInChildren<Tilemap>();
         
         if (tilemap != null && useTilemap)
         {
-            DebugLog.Info("[BackgroundManager] Using existing Tilemap");
+            DebugLog.Info($"[BackgroundManager] Using existing Tilemap: {tilemap.name}");
             isInitialized = true;
             return;
         }
         
+        PersistentLogger.Info("No tilemap found, creating sprite-based background", "BackgroundManager");
+        Debug.Log("[BackgroundManager] No tilemap found, creating sprite-based background");
+        DebugLog.Info("[BackgroundManager] No tilemap found, creating sprite-based background");
+        
         // Fall back to sprite-based background
         CreateSpriteBackground();
         isInitialized = true;
+        
+        Debug.Log("[BackgroundManager] Background initialization complete");
+        DebugLog.Info("[BackgroundManager] Background initialization complete");
     }
     
     /// <summary>
@@ -54,24 +94,33 @@ public class BackgroundManager : MonoBehaviour
     /// </summary>
     private void CreateSpriteBackground()
     {
+        PersistentLogger.Info("CreateSpriteBackground() starting...", "BackgroundManager");
+        Debug.Log("[BackgroundManager] CreateSpriteBackground() starting...");
+        DebugLog.Info("[BackgroundManager] CreateSpriteBackground() starting...");
+        
         // Create background GameObject
         GameObject bgObj = new GameObject("Background");
         bgObj.transform.parent = transform;
         bgObj.transform.position = Vector3.zero;
+        DebugLog.Info($"[BackgroundManager] Created Background GameObject at position {bgObj.transform.position}");
         
         backgroundRenderer = bgObj.AddComponent<SpriteRenderer>();
         backgroundRenderer.sortingOrder = -100; // Draw behind everything
+        DebugLog.Info($"[BackgroundManager] Added SpriteRenderer with sortingOrder: {backgroundRenderer.sortingOrder}");
         
         // Create background texture (larger for better coverage)
         int textureSize = 1024;
         Texture2D bgTexture = new Texture2D(textureSize, textureSize);
         bgTexture.filterMode = FilterMode.Point;
         bgTexture.wrapMode = TextureWrapMode.Repeat;
+        DebugLog.Info($"[BackgroundManager] Created texture: {textureSize}x{textureSize}, FilterMode={bgTexture.filterMode}");
         
         // Generate grass pattern
         Color[] pixels = new Color[textureSize * textureSize];
         int tileSize = 32; // Size of each grass tile
         int tilesPerSide = textureSize / tileSize;
+        
+        DebugLog.Info($"[BackgroundManager] Generating {tilesPerSide}x{tilesPerSide} grass tiles...");
         
         for (int tileY = 0; tileY < tilesPerSide; tileY++)
         {
@@ -79,6 +128,14 @@ public class BackgroundManager : MonoBehaviour
             {
                 // Create unique grass tile for each position
                 Sprite grassTile = BackgroundLoader.CreateGrassTile(tileX + tileY * tilesPerSide);
+                
+                if (grassTile == null)
+                {
+                    PersistentLogger.Error($"BackgroundLoader.CreateGrassTile returned NULL at tile ({tileX}, {tileY})!", "BackgroundManager");
+                    Debug.LogError($"[BackgroundManager] BackgroundLoader.CreateGrassTile returned NULL at tile ({tileX}, {tileY})!");
+                    DebugLog.Error($"[BackgroundManager] BackgroundLoader.CreateGrassTile returned NULL at tile ({tileX}, {tileY})!");
+                    continue;
+                }
                 
                 // Copy tile pixels to main texture
                 Color[] tilePixels = grassTile.texture.GetPixels();
@@ -94,12 +151,15 @@ public class BackgroundManager : MonoBehaviour
             }
         }
         
+        DebugLog.Info("[BackgroundManager] Grass tiles generated, applying to texture...");
         bgTexture.SetPixels(pixels);
         
         // Add dirt paths through the grass
+        DebugLog.Info("[BackgroundManager] Adding dirt paths...");
         AddDirtPaths(bgTexture, tileSize);
         
         bgTexture.Apply();
+        DebugLog.Info("[BackgroundManager] Texture finalized");
         
         // Create sprite from texture
         Sprite bgSprite = Sprite.Create(
@@ -109,7 +169,20 @@ public class BackgroundManager : MonoBehaviour
             32 // Pixels per unit (matches game sprites)
         );
         
+        if (bgSprite == null)
+        {
+            PersistentLogger.Error("Sprite.Create returned NULL!", "BackgroundManager");
+            Debug.LogError("[BackgroundManager] Sprite.Create returned NULL!");
+            DebugLog.Error("[BackgroundManager] Sprite.Create returned NULL!");
+            return;
+        }
+        
+        PersistentLogger.Info($"Created sprite: {bgSprite.texture.width}x{bgSprite.texture.height}, PPU={bgSprite.pixelsPerUnit}", "BackgroundManager");
+        Debug.Log($"[BackgroundManager] Created sprite: {bgSprite.texture.width}x{bgSprite.texture.height}, PPU={bgSprite.pixelsPerUnit}");
+        DebugLog.Info($"[BackgroundManager] Created sprite: {bgSprite.texture.width}x{bgSprite.texture.height}, PPU={bgSprite.pixelsPerUnit}");
+        
         backgroundRenderer.sprite = bgSprite;
+        DebugLog.Info("[BackgroundManager] Assigned sprite to SpriteRenderer");
         
         // Scale to cover camera view with extra margin
         if (mainCamera != null)
@@ -123,8 +196,23 @@ public class BackgroundManager : MonoBehaviour
             float scale = Mathf.Max(scaleX, scaleY);
             
             bgObj.transform.localScale = Vector3.one * scale;
+            
+            DebugLog.Info($"[BackgroundManager] Camera size: {camWidth}x{camHeight}, Background scale: {scale}");
+        }
+        else
+        {
+            DebugLog.Warning("[BackgroundManager] mainCamera is NULL, skipping scale calculation");
         }
         
+        // Verify renderer is enabled and visible
+        Debug.Log($"[BackgroundManager] SpriteRenderer enabled: {backgroundRenderer.enabled}, sprite: {backgroundRenderer.sprite != null}");
+        Debug.Log($"[BackgroundManager] GameObject active: {bgObj.activeSelf}, layer: {bgObj.layer}");
+        DebugLog.Info($"[BackgroundManager] SpriteRenderer enabled: {backgroundRenderer.enabled}, sprite: {backgroundRenderer.sprite != null}");
+        DebugLog.Info($"[BackgroundManager] GameObject active: {bgObj.activeSelf}, layer: {bgObj.layer}");
+        
+        PersistentLogger.Info($"Created procedural grass background ({textureSize}x{textureSize}, {tilesPerSide}x{tilesPerSide} tiles)", "BackgroundManager");
+        PersistentLogger.Separator();
+        Debug.Log($"[BackgroundManager] Created procedural grass background ({textureSize}x{textureSize}, {tilesPerSide}x{tilesPerSide} tiles)");
         DebugLog.Info($"[BackgroundManager] Created procedural grass background ({textureSize}x{textureSize}, {tilesPerSide}x{tilesPerSide} tiles)");
     }
     
@@ -198,27 +286,6 @@ public class BackgroundManager : MonoBehaviour
                     texture.SetPixel(x, y, finalColor);
                 }
             }
-        }
-    }
-    
-    /// <summary>
-    /// Update background to follow camera (for infinite scrolling effect if needed)
-    /// </summary>
-    private void LateUpdate()
-    {
-        if (mainCamera != null && backgroundRenderer != null)
-        {
-            // Keep background centered on camera with pixel-perfect positioning to prevent stuttering
-            Vector3 camPos = mainCamera.transform.position;
-            
-            // Calculate pixels per unit (assuming 32 PPU for the grass texture)
-            float pixelsPerUnit = 32f;
-            
-            // Round to nearest pixel to prevent sub-pixel movement stuttering
-            float roundedX = Mathf.Round(camPos.x * pixelsPerUnit) / pixelsPerUnit;
-            float roundedY = Mathf.Round(camPos.y * pixelsPerUnit) / pixelsPerUnit;
-            
-            transform.position = new Vector3(roundedX, roundedY, 0f);
         }
     }
 }

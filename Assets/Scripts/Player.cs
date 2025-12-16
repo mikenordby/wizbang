@@ -5,6 +5,10 @@ using UnityEngine;
 /// </summary>
 public class Player : MonoBehaviour, ICollidable
 {
+    [Header("Character")]
+    private CharacterData characterData;
+    private bool isInitialized = false;
+    
     [Header("Level & XP")]
     [SerializeField] private int currentLevel = 1;
     [SerializeField] private int currentXP = 0;
@@ -110,33 +114,99 @@ public class Player : MonoBehaviour, ICollidable
     
     void Start()
     {
-        CalculateXPToNextLevel();
-        levelUpUI = GameServices.LevelUpUI;
+        // Initialization is deferred until InitializeWithCharacter() is called by CharacterSelectionUI
+        // This allows character selection before game starts
+    }
+    
+    /// <summary>
+    /// Initialize player with selected character data.
+    /// Called by CharacterSelectionUI after character selection.
+    /// </summary>
+    public void InitializeWithCharacter(CharacterData character)
+    {
+        if (isInitialized)
+        {
+            DebugLog.Warning("[Player] Already initialized, ignoring duplicate initialization");
+            return;
+        }
         
-        // Load wizard sprite (from Resources or procedural fallback)
+        characterData = character;
+        
+        // Apply base stats from character
+        moveSpeedMultiplier = character.moveSpeedModifier;
+        damageMultiplier = character.damageModifier;
+        attackSpeedMultiplier = character.attackSpeedModifier;
+        critChance = character.startingCritChance;
+        critDamage = character.critDamageModifier;
+        xpMagnetRange = character.xpMagnetRange;
+        pickupRadius = character.pickupRadius;
+        healthRegen = character.healthRegen;
+        
+        // Initialize health with character's base health
+        Health health = GetComponent<Health>();
+        if (health == null)
+            health = gameObject.AddComponent<Health>();
+        health.Initialize(character.baseMaxHealth);
+        
+        // Update PlayerMovement with character's move speed
+        PlayerMovement movement = GetComponent<PlayerMovement>();
+        if (movement != null)
+        {
+            movement.SetMoveSpeedModifier(character.moveSpeedModifier);
+        }
+        
+        // Load character sprite
         SpriteRenderer sr = GetComponent<SpriteRenderer>();
         if (sr == null)
             sr = gameObject.AddComponent<SpriteRenderer>();
         
-        Sprite oldSprite = sr.sprite;
-        sr.sprite = SpriteLoader.LoadWizardSprite();
-        
-        // Make wizard larger and more visible
-        transform.localScale = Vector3.one * 2.0f;
+        sr.sprite = LoadCharacterSprite(character.spriteType);
+        sr.color = character.characterColor;
+        sr.sortingOrder = 10; // Above ground and projectiles
+        transform.localScale = Vector3.one * 2.0f * character.characterScale;
         
         if (sr.sprite != null)
         {
-            DebugLog.Info($"Player.Start: Sprite set - Size: {sr.sprite.texture.width}x{sr.sprite.texture.height}px, PPU: {sr.sprite.pixelsPerUnit}, Scale: {transform.localScale}");
-            DebugLog.Info($"Player.Start: SpriteRenderer bounds: {sr.bounds.size}, Sprite rect: {sr.sprite.rect}");
+            DebugLog.Info($"Player.InitializeWithCharacter: {character.characterName} sprite loaded - Size: {sr.sprite.texture.width}x{sr.sprite.texture.height}px");
         }
         else
         {
-            DebugLog.Error("Player.Start: Failed to load wizard sprite!");
+            DebugLog.Error($"Player.InitializeWithCharacter: Failed to load {character.spriteType} sprite!");
         }
         
-        // Sprite replacement is expected during asset updates, no warning needed
+        // Add starting weapon
+        WeaponInventory weaponInventory = GetComponent<WeaponInventory>();
+        if (weaponInventory == null)
+            weaponInventory = gameObject.AddComponent<WeaponInventory>();
         
-        DebugLog.Info($"Player.Start: Level {currentLevel}, XP {currentXP}/{xpToNextLevel}");
+        weaponInventory.AddWeapon(character.startingWeaponType);
+        
+        CalculateXPToNextLevel();
+        levelUpUI = GameServices.LevelUpUI;
+        
+        // Subscribe to game events
+        GameEvents.OnEnemyKilled += OnEnemyKilledHandler;
+        
+        isInitialized = true;
+        
+        DebugLog.Info($"Player.InitializeWithCharacter: {character.characterName} ready! Level {currentLevel}, XP {currentXP}/{xpToNextLevel}");
+    }
+    
+    /// <summary>
+    /// Load character sprite based on type
+    /// </summary>
+    private Sprite LoadCharacterSprite(string spriteType)
+    {
+        switch (spriteType.ToLower())
+        {
+            case "wizard":
+                return SpriteLoader.LoadWizardSprite();
+            case "knight":
+                return SpriteLoader.LoadKnightSprite();
+            default:
+                DebugLog.Warning($"[Player] Unknown sprite type '{spriteType}', defaulting to wizard");
+                return SpriteLoader.LoadWizardSprite();
+        }
     }
     
     /// <summary>
@@ -146,6 +216,9 @@ public class Player : MonoBehaviour, ICollidable
     {
         currentXP += amount;
         DebugLog.Info($"Player.AddXP: Gained {amount} XP, total={currentXP}/{xpToNextLevel}");
+        
+        // Trigger XP gained event
+        GameEvents.TriggerXPGained(amount, currentXP);
         
         // Check for level up
         while (currentXP >= xpToNextLevel)
@@ -165,6 +238,9 @@ public class Player : MonoBehaviour, ICollidable
         
         DebugLog.Info($"Player.LevelUp: LEVEL UP! Now level {currentLevel}, XP={currentXP}/{xpToNextLevel}");
         
+        // Trigger level up event (UI will subscribe to this)
+        GameEvents.TriggerPlayerLevelUp(currentLevel);
+        
         if (levelUpUI != null)
         {
             levelUpUI.ShowUI(currentLevel);
@@ -182,9 +258,9 @@ public class Player : MonoBehaviour, ICollidable
     }
     
     /// <summary>
-    /// Increment enemy kill count
+    /// Event handler for enemy deaths (increments kill count)
     /// </summary>
-    public void OnEnemyKilled()
+    private void OnEnemyKilledHandler(Enemy enemy)
     {
         enemiesKilled++;
     }
@@ -203,6 +279,14 @@ public class Player : MonoBehaviour, ICollidable
     public void OnDamageTaken(float amount)
     {
         damageTaken += amount;
+    }
+    
+    /// <summary>
+    /// Cleanup event subscriptions on destroy
+    /// </summary>
+    private void OnDestroy()
+    {
+        GameEvents.OnEnemyKilled -= OnEnemyKilledHandler;
     }
     
     /// <summary>
@@ -247,5 +331,66 @@ public class Player : MonoBehaviour, ICollidable
         }
         
         DebugLog.Info($"Player.ModifyStat: {statName} modified by {value} ({(isMultiplier ? "multiply" : "add")})");
+    }
+    
+    // ===== Stat Upgrade Methods (for UpgradeChoiceGenerator) =====
+    
+    public void AddDamageMultiplier(float amount) 
+    { 
+        damageMultiplier += amount;
+        DebugLog.Info($"[Player] Damage: {damageMultiplier:F2}x");
+    }
+    
+    public void AddAttackSpeedMultiplier(float amount) 
+    { 
+        attackSpeedMultiplier += amount;
+        DebugLog.Info($"[Player] Attack Speed: {attackSpeedMultiplier:F2}x");
+    }
+    
+    public void AddCritChance(float amount) 
+    { 
+        critChance = Mathf.Clamp01(critChance + amount);
+        DebugLog.Info($"[Player] Crit Chance: {critChance * 100:F1}%");
+    }
+    
+    public void AddCritDamage(float amount) 
+    { 
+        critDamage += amount;
+        DebugLog.Info($"[Player] Crit Damage: {critDamage:F2}x");
+    }
+    
+    public void AddMaxHealth(float amount)
+    {
+        var health = GetComponent<Health>();
+        if (health != null)
+        {
+            health.IncreaseMaxHealth(amount);
+            DebugLog.Info($"[Player] Max Health: {health.MaxHealth}");
+        }
+    }
+    
+    public void AddHealthRegen(float amount) 
+    { 
+        healthRegen += amount;
+        DebugLog.Info($"[Player] Health Regen: {healthRegen:F1}/s");
+    }
+    
+    public void AddMoveSpeedMultiplier(float amount) 
+    { 
+        moveSpeedMultiplier += amount;
+        DebugLog.Info($"[Player] Move Speed: {moveSpeedMultiplier:F2}x");
+    }
+    
+    public void AddPickupRadius(float multiplier) 
+    { 
+        pickupRadius *= (1f + multiplier);
+        xpMagnetRange *= (1f + multiplier);
+        DebugLog.Info($"[Player] Pickup Radius: {pickupRadius:F1}, Magnet: {xpMagnetRange:F1}");
+    }
+    
+    public void AddDamageReduction(float amount) 
+    { 
+        damageReduction = Mathf.Clamp01(damageReduction + amount);
+        DebugLog.Info($"[Player] Damage Reduction: {damageReduction * 100:F1}%");
     }
 }

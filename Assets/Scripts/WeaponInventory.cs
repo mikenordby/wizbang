@@ -20,8 +20,8 @@ public class WeaponInventory : MonoBehaviour
     
     private void Start()
     {
-        // Start with Magic Missile only
-        AddWeapon("MagicMissile");
+        // Starting weapon is now added by Player.InitializeWithCharacter() based on selected character
+        // No longer adding default ProjectileWeapon here
         
         DebugLog.Info($"[WeaponInventory] Started with {activeWeapons.Count} weapon(s)");
     }
@@ -57,6 +57,10 @@ public class WeaponInventory : MonoBehaviour
         
         activeWeapons.Add(weapon);
         DebugLog.Info($"[WeaponInventory] Added {weapon.WeaponName} (slot {activeWeapons.Count}/{maxWeaponSlots})");
+        
+        // Trigger weapon added event
+        GameEvents.TriggerWeaponAdded(weapon);
+        
         return true;
     }
     
@@ -79,29 +83,42 @@ public class WeaponInventory : MonoBehaviour
         }
         
         weapon.LevelUp();
+        
+        // Trigger weapon upgraded event
+        GameEvents.TriggerWeaponUpgraded(weapon, weapon.WeaponLevel);
+        
         return true;
     }
     
     /// <summary>
-    /// Upgrade a weapon by name.
+    /// Upgrade a weapon by type name.
     /// </summary>
-    public bool UpgradeWeapon(string weaponName)
+    public bool UpgradeWeapon(string weaponType)
     {
-        Weapon weapon = activeWeapons.Find(w => w.WeaponName == weaponName);
+        Weapon weapon = activeWeapons.Find(w => w.GetType().Name == weaponType);
         if (weapon == null)
         {
-            DebugLog.Warning($"[WeaponInventory] Weapon not found: {weaponName}");
+            DebugLog.Warning($"[WeaponInventory] Weapon type not found: {weaponType}");
             return false;
         }
         
         if (weapon.IsMaxLevel)
         {
-            DebugLog.Warning($"[WeaponInventory] {weaponName} is already max level");
+            DebugLog.Warning($"[WeaponInventory] {weapon.WeaponName} is already max level");
             return false;
         }
         
         weapon.LevelUp();
+        DebugLog.Info($"[WeaponInventory] Upgraded {weapon.WeaponName} to level {weapon.WeaponLevel}");
         return true;
+    }
+    
+    /// <summary>
+    /// Check if player has a weapon by type name.
+    /// </summary>
+    public bool HasWeapon(string weaponType)
+    {
+        return activeWeapons.Find(w => w.GetType().Name == weaponType) != null;
     }
     
     /// <summary>
@@ -114,16 +131,24 @@ public class WeaponInventory : MonoBehaviour
         
         Weapon weapon = weaponType switch
         {
+            "ProjectileWeapon" => weaponObj.AddComponent<ProjectileWeapon>(),
             "MagicMissile" => weaponObj.AddComponent<ProjectileWeapon>(),
             "OrbiterWeapon" => weaponObj.AddComponent<OrbiterWeapon>(),
             "BoomerangWeapon" => weaponObj.AddComponent<BoomerangWeapon>(),
             "RapidFireWeapon" => weaponObj.AddComponent<RapidFireWeapon>(),
+            "LightningWeapon" => weaponObj.AddComponent<LightningWeapon>(),
+            "PoisonWeapon" => weaponObj.AddComponent<PoisonWeapon>(),
+            "LaserWeapon" => weaponObj.AddComponent<LaserWeapon>(),
             _ => null
         };
         
         if (weapon == null)
         {
             Destroy(weaponObj);
+        }
+        else
+        {
+            weapon.Initialize(transform, player);
         }
         
         return weapon;

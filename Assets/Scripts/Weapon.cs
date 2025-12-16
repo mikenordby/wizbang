@@ -68,6 +68,21 @@ public abstract class Weapon : MonoBehaviour
         RecalculateStats();
     }
     
+    protected virtual void Start()
+    {
+        // Override in subclasses for initialization after Awake
+    }
+    
+    /// <summary>
+    /// Initialize weapon with player reference (called by WeaponInventory)
+    /// </summary>
+    public virtual void Initialize(Transform playerTransform, Player player)
+    {
+        this.playerTransform = playerTransform;
+        this.player = player;
+        RecalculateStats();
+    }
+    
     protected virtual void Update()
     {
         if (GameState.IsPaused) return;
@@ -132,8 +147,17 @@ public abstract class Weapon : MonoBehaviour
     public virtual void LevelUp()
     {
         weaponLevel++;
+        ApplyLevelUpgrades();
         RecalculateStats();
         DebugLog.Info($"[Weapon] {weaponName} leveled up to {weaponLevel}");
+    }
+    
+    /// <summary>
+    /// Apply level-specific upgrades (override in subclasses for custom scaling)
+    /// </summary>
+    protected virtual void ApplyLevelUpgrades()
+    {
+        // Base implementation - subclasses override for custom behavior
     }
     
     /// <summary>
@@ -146,6 +170,8 @@ public abstract class Weapon : MonoBehaviour
         currentDamage = baseDamage * (1f + damageUpgradeBonus / 100f);
         if (player != null)
             currentDamage *= player.DamageMultiplier;
+        
+        DebugLog.Info($"[Weapon.RecalculateStats] {weaponName}: baseDamage={baseDamage:F1}, upgradeBonus={damageUpgradeBonus:F1}%, playerMult={player?.DamageMultiplier:F2} → currentDamage={currentDamage:F1}");
         
         // Fire rate: base + upgrade bonus + player attack speed
         float fireRateUpgradeBonus = upgrades[WeaponUpgrade.UpgradeType.FireRate].GetFireRateBonus();
@@ -169,6 +195,7 @@ public abstract class Weapon : MonoBehaviour
     // Public getters
     public string WeaponName => weaponName;
     public int WeaponLevel => weaponLevel;
+    public int MaxWeaponLevel => maxWeaponLevel;
     public bool IsMaxLevel => weaponLevel >= maxWeaponLevel;
     public float Damage => currentDamage;
     public float FireRate => currentFireRate;

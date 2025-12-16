@@ -8,7 +8,7 @@ public class OrbiterManager : MonoBehaviour
 {
     [SerializeField] private Transform playerTransform;
     private int maxOrbiters = 8; // Not serialized - prevents Inspector override limiting to 2
-    [SerializeField] private float orbitSpeed = 1f;
+    [SerializeField] private float orbitSpeed = 5f; // Increased from 1f to 5f for faster spinning
     [SerializeField] private float orbitRadius = 2f;
     [SerializeField] private float damage = 15f;
     

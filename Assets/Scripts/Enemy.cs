@@ -86,8 +86,8 @@ public class Enemy : MonoBehaviour, ICollidable
         if (enemyCollider == null)
         {
             enemyCollider = gameObject.AddComponent<CircleCollider2D>();
-            enemyCollider.radius = 0.4f; // Match visual body size for pushing
-            enemyCollider.isTrigger = false; // Physical collision for pushing
+            enemyCollider.radius = 0.5f; // Larger radius to prevent overlap (64px sprite = 1.0 unit, so 0.5 is half)
+            enemyCollider.isTrigger = false; // Physical collision enabled - enemies push each other
         }
         
         // Add Rigidbody2D for physics
@@ -99,8 +99,15 @@ public class Enemy : MonoBehaviour, ICollidable
             rb.gravityScale = 0f;
             rb.constraints = RigidbodyConstraints2D.FreezeRotation;
             rb.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
-            rb.mass = 1f; // Light mass for responsive collision
-            rb.linearDamping = 2f; // Add drag so enemies don't slide when pushed
+            rb.mass = 0.5f; // Low mass so enemies don't stack heavily
+            rb.linearDamping = 3f; // High damping to slow them down quickly after collision
+        }
+        
+        // Ensure enemies are on Default layer (0) which should collide with Obstacles layer
+        // If enemies are on a custom layer, make sure it's set to collide with Obstacles in Physics2D settings
+        if (gameObject.layer == 0) // Default layer
+        {
+            // Keep on Default layer - this should collide with everything including Obstacles
         }
         
         if (spriteRenderer != null && spriteRenderer.sprite == null)
@@ -230,6 +237,9 @@ public class Enemy : MonoBehaviour, ICollidable
     private void HandleDeath()
     {
         DebugLog.Info($"Enemy.HandleDeath: {stats?.enemyName} died at {transform.position}");
+        
+        // Fire event for other systems to react
+        GameEvents.TriggerEnemyKilled(this);
         
         // Spawn XP orb using GameServices
         XPOrbPool pool = GameServices.XPOrbPool;

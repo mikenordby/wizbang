@@ -1,5 +1,13 @@
 using UnityEngine;
 
+public enum Direction
+{
+    South,  // Down
+    North,  // Up
+    East,   // Right
+    West    // Left
+}
+
 public class PlayerMovement : MonoBehaviour
 {
     [SerializeField] private float moveSpeed = 5f;
@@ -7,6 +15,8 @@ public class PlayerMovement : MonoBehaviour
     private Rigidbody2D rb;
     private Vector2 moveInput;
     private Player player;
+    private DirectionalSpriteController directionController;
+    private AnimatedSpriteController animController;
     
     // Position logging
     private float logTimer = 0f;
@@ -16,6 +26,9 @@ private void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
         player = GetComponent<Player>();
+        directionController = GetComponent<DirectionalSpriteController>();
+        
+        DebugLog.Info($"[PlayerMovement] Awake: directionController {(directionController != null ? "FOUND" : "NULL")}");
         
         // Create a simple white square sprite if none exists
         SpriteRenderer sr = GetComponent<SpriteRenderer>();
@@ -36,6 +49,9 @@ private void Awake()
     
 private void Update()
     {
+        // ONLY move during gameplay phase
+        if (GamePhaseManager.CurrentPhase != GamePhase.Gameplay) return;
+        
         if (GameState.IsPaused)
         {
             // Log position during pause to verify we're not moving
@@ -73,6 +89,44 @@ private void Update()
         }
         
         moveInput.Normalize(); // Prevent faster diagonal movement
+        
+        // Lazy-fetch controllers if not yet cached (they're created later by Player.InitializeWithCharacter)
+        if (animController == null)
+        {
+            animController = GetComponent<AnimatedSpriteController>();
+        }
+        
+        // Use animated sprite controller if available, otherwise fall back to static directional sprites
+        if (animController != null && animController.IsInitialized)
+        {
+            if (moveInput != Vector2.zero)
+            {
+                // Playing walking animation
+                if (!animController.IsPlaying)
+                    animController.Play();
+                
+                animController.UpdateDirection(moveInput);
+            }
+            else
+            {
+                // Stopped moving - pause animation on first frame
+                if (animController.IsPlaying)
+                    animController.Stop();
+            }
+        }
+        else
+        {
+            // Fallback to static directional sprites
+            if (directionController == null)
+            {
+                directionController = GetComponent<DirectionalSpriteController>();
+            }
+            
+            if (moveInput != Vector2.zero && directionController != null)
+            {
+                directionController.UpdateDirection(moveInput);
+            }
+        }
     }
     
     private void FixedUpdate()

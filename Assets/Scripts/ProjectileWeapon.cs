@@ -1,10 +1,12 @@
 using UnityEngine;
+using System.Collections.Generic;
 
 /// <summary>
 /// Auto-aim projectile weapon that shoots at nearest enemy.
 /// Inherits fire rate and damage from Weapon base class.
+/// Implements IWeaponCollisionHandler for self-managed collision detection.
 /// </summary>
-public class ProjectileWeapon : Weapon
+public class ProjectileWeapon : Weapon, IWeaponCollisionHandler
 {
     private ProjectilePool projectilePool;
     private EnemyPool enemyPool;
@@ -15,8 +17,7 @@ public class ProjectileWeapon : Weapon
         weaponName = "Magic Missile";
         baseDamage = 10f;
         baseFireRate = 1f;
-        spreadAngle = 15f; // Spread for multiple projectiles
-        projectileSpeed = 8f;
+        projectileSize = 1.2f; // Standard projectile size
         
         base.Awake(); // This calls RecalculateStats()
         
@@ -49,6 +50,7 @@ public class ProjectileWeapon : Weapon
             float angleOffset = 0f;
             if (currentProjectileCount > 1)
             {
+                float spreadAngle = 15f; // Degrees of spread between projectiles
                 float totalSpread = spreadAngle * (currentProjectileCount - 1);
                 angleOffset = -totalSpread / 2f + (spreadAngle * i);
             }
@@ -61,8 +63,9 @@ public class ProjectileWeapon : Weapon
             Projectile projectile = projectilePool.GetProjectile();
             if (projectile != null)
             {
-                DebugLog.Info($"[ProjectileWeapon.Fire] Setting projectile stats: damage={currentDamage:F1} pierce={currentPierce}");
-                projectile.SetStats(currentDamage, currentPierce, DamageType.Physical);
+                float finalSize = currentProjectileSize * (player != null ? player.ProjectileSizeMultiplier : 1f);
+                DebugLog.Info($"[ProjectileWeapon.Fire] Setting projectile stats: damage={currentDamage:F1} pierce={currentPierce} size={finalSize:F2}");
+                projectile.SetStats(currentDamage, currentPierce, DamageType.Physical, finalSize);
                 projectile.ActivateStraight(playerTransform.position, direction);
             }
             else
@@ -94,4 +97,84 @@ public class ProjectileWeapon : Weapon
         
         return nearest;
     }
+    
+    #region IWeaponCollisionHandler Implementation
+    
+    /// <summary>
+    /// Check collisions for projectiles from this weapon.
+    /// Note: All ProjectileWeapon and RapidFireWeapon share the same pool,
+    /// so we check ALL projectiles, not just ones from this specific weapon.
+    /// </summary>
+    public void CheckCollisions(SpatialHashGrid grid, EnemyPool enemyPool)
+    {
+        if (grid == null || enemyPool == null || projectilePool == null) return;
+        
+        // Get all active projectiles (shared pool)
+        List<Projectile> activeProjectiles = new List<Projectile>(projectilePool.GetActiveProjectiles());
+        
+        foreach (var projectile in activeProjectiles)
+        {
+            if (!projectile.IsActive) continue;
+            
+            // Query spatial grid for nearby enemies
+            var nearbyEntities = grid.Query(
+                projectile.Position,
+                projectile.CollisionRadius,
+                CollisionLayer.Enemy
+            );
+            
+            foreach (var entity in nearbyEntities)
+            {
+                if (entity is Enemy enemy && enemy.gameObject.activeInHierarchy)
+                {
+                    float distance = UnityEngine.Vector3.Distance(projectile.Position, enemy.Position);
+                    float combinedRadius = projectile.CollisionRadius + enemy.CollisionRadius;
+                    
+                    if (distance < combinedRadius)
+                    {
+                        int enemyID = enemy.gameObject.GetInstanceID();
+                        if (projectile.RegisterHit(enemyID))
+                        {
+                            Health enemyHealth = enemy.GetComponent<Health>();
+                            if (enemyHealth != null)
+                            {
+                                DamageContext context = new DamageContext
+                                {
+                                    baseDamage = projectile.Damage,
+                                    player = GameServices.Player,
+                                    enemy = enemy,
+                                    damageType = projectile.DamageType
+                                };
+                                
+                                DamageResult result = DamageCalculator.Instance.CalculateDamage(context);
+                                enemyHealth.TakeDamage(result.finalDamage);
+                                
+                                DamageNumberPool damagePool = GameServices.DamageNumberPool;
+                                if (damagePool != null)
+                                {
+                                    if (result.isCritical)
+                                        damagePool.ShowCriticalDamage(enemy.Position, result.finalDamage);
+                                    else
+                                        damagePool.ShowDamage(enemy.Position, result.finalDamage);
+                                }
+                            }
+                            
+                            if (projectile.EnemiesHit > projectile.Pierce)
+                            {
+                                projectile.Deactivate();
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    /// <summary>
+    /// Whether this weapon is active and should check collisions
+    /// </summary>
+    bool IWeaponCollisionHandler.IsActive => gameObject.activeInHierarchy && enabled;
+    
+    #endregion
 }

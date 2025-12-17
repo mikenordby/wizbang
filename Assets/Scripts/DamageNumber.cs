@@ -8,10 +8,14 @@ public class DamageNumber : MonoBehaviour
 {
     [SerializeField] private float lifetime = 1f;
     [SerializeField] private float moveSpeed = 2f;
+    [SerializeField] private float scaleSpeed = 8f; // How fast the pop-in happens
     
     private TextMeshPro textMesh;
     private float timer;
     private Color startColor;
+    private float currentScale;
+    private float targetScale;
+    private Vector3 moveDirection;
     
     private void Awake()
     {
@@ -44,8 +48,17 @@ public class DamageNumber : MonoBehaviour
         startColor = isCrit ? new Color(1f, 0.843f, 0f) : Color.white; // Gold: #FFD700
         textMesh.color = startColor;
         
-        // Make 1.5x larger if crit
-        textMesh.fontSize = isCrit ? 4.5f : 3f;
+        // Set target font size (1.5x larger if crit)
+        float baseFontSize = isCrit ? 4.5f : 3f;
+        targetScale = baseFontSize;
+        
+        // Start small for pop-in animation
+        currentScale = 0f;
+        textMesh.fontSize = 0f;
+        
+        // Add slight random horizontal spread
+        float randomAngle = Random.Range(-30f, 30f);
+        moveDirection = Quaternion.Euler(0, 0, randomAngle) * Vector3.up;
         
         gameObject.SetActive(true);
     }
@@ -65,18 +78,39 @@ public class DamageNumber : MonoBehaviour
         startColor = color;
         textMesh.color = startColor;
         
-        // Make 1.5x larger if crit
-        textMesh.fontSize = isCrit ? 4.5f : 3f;
+        // Set target font size (1.5x larger if crit)
+        float baseFontSize = isCrit ? 4.5f : 3f;
+        targetScale = baseFontSize;
+        
+        // Start small for pop-in animation
+        currentScale = 0f;
+        textMesh.fontSize = 0f;
+        
+        // Add slight random horizontal spread
+        float randomAngle = Random.Range(-30f, 30f);
+        moveDirection = Quaternion.Euler(0, 0, randomAngle) * Vector3.up;
         
         gameObject.SetActive(true);
     }
     
     private void Update()
     {
+        if (GamePhaseManager.CurrentPhase != GamePhase.Gameplay) return;
         if (GameState.IsPaused) return;
         
-        // Move upward
-        transform.position += Vector3.up * moveSpeed * Time.deltaTime;
+        // Pop-in scale animation (elastic overshoot)
+        if (currentScale < targetScale)
+        {
+            currentScale = Mathf.Lerp(currentScale, targetScale * 1.1f, scaleSpeed * Time.deltaTime);
+            if (currentScale >= targetScale * 0.99f)
+            {
+                currentScale = targetScale;
+            }
+            textMesh.fontSize = currentScale;
+        }
+        
+        // Move in random direction (mostly up)
+        transform.position += moveDirection * moveSpeed * Time.deltaTime;
         
         // Fade out
         timer -= Time.deltaTime;

@@ -39,6 +39,9 @@ public class TreasureChestSpawner : MonoBehaviour
     
     private void Update()
     {
+        // Only spawn chests during active gameplay
+        if (GamePhaseManager.CurrentPhase != GamePhase.Gameplay) return;
+        
         if (player == null) return;
         
         Vector2Int playerChunk = GetChunkCoord(player.position);

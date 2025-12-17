@@ -8,7 +8,7 @@ public class OrbiterManager : MonoBehaviour
 {
     [SerializeField] private Transform playerTransform;
     private int maxOrbiters = 8; // Not serialized - prevents Inspector override limiting to 2
-    [SerializeField] private float orbitSpeed = 5f; // Increased from 1f to 5f for faster spinning
+    [SerializeField] private float orbitSpeed = 8f; // Fast spinning blades
     [SerializeField] private float orbitRadius = 2f;
     [SerializeField] private float damage = 15f;
     
@@ -88,6 +88,18 @@ public class OrbiterManager : MonoBehaviour
     }
     
     /// <summary>
+    /// Set orbiter size multiplier
+    /// </summary>
+    public void SetSize(float sizeMultiplier)
+    {
+        foreach (var orbiter in orbiters)
+        {
+            if (orbiter != null)
+                orbiter.SetSize(sizeMultiplier);
+        }
+    }
+    
+    /// <summary>
     /// Set orbit speed multiplier
     /// </summary>
     public void SetOrbitSpeed(float speed)
@@ -110,6 +122,18 @@ public class OrbiterManager : MonoBehaviour
         {
             if (orbiter != null)
                 orbiter.SetOrbitRadius(orbitRadius);
+        }
+    }
+    
+    /// <summary>
+    /// Set hit cooldown based on fire rate (higher fire rate = faster hits)
+    /// </summary>
+    public void SetHitCooldown(float cooldown)
+    {
+        foreach (var orbiter in orbiters)
+        {
+            if (orbiter != null)
+                orbiter.SetHitCooldown(cooldown);
         }
     }
     

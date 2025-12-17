@@ -10,6 +10,8 @@ public class Enemy : MonoBehaviour, ICollidable
     private Health health;
     private Transform playerTransform;
     private SpriteRenderer spriteRenderer;
+    private DirectionalSpriteController directionController;
+    private AnimatedSpriteController animController;
     private bool isActive;
     private CircleCollider2D enemyCollider;
     private Rigidbody2D rb;
@@ -151,25 +153,6 @@ public class Enemy : MonoBehaviour, ICollidable
         stats = enemyStats;
         transform.position = position;
         
-        // Initialize if not already done (first activation)
-        if (spriteRenderer == null)
-        {
-            spriteRenderer = GetComponent<SpriteRenderer>();
-            if (spriteRenderer != null && spriteRenderer.sprite == null)
-            {
-                // Load sprite based on enemy type (from Resources or procedural fallback)
-                spriteRenderer.sprite = SpriteLoader.LoadEnemySprite(stats.enemyName, stats.color);
-                if (spriteRenderer.sprite != null)
-                {
-                    DebugLog.Info($"Enemy.Activate: Loaded sprite for {stats.enemyName}: {spriteRenderer.sprite.texture.width}x{spriteRenderer.sprite.texture.height}px, PPU={spriteRenderer.sprite.pixelsPerUnit}");
-                }
-            }
-        }
-        else if (spriteRenderer != null && spriteRenderer.sprite != null)
-        {
-            DebugLog.Info($"Enemy.Activate: Using existing sprite for {stats.enemyName}: {spriteRenderer.sprite.texture.width}x{spriteRenderer.sprite.texture.height}px");
-        }
-        
         // Lazy initialization if not already done
         if (spriteRenderer == null)
             spriteRenderer = GetComponent<SpriteRenderer>();
@@ -179,14 +162,6 @@ public class Enemy : MonoBehaviour, ICollidable
             GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
             if (playerObj != null)
                 playerTransform = playerObj.transform;
-        }
-        
-        // Load sprite if it doesn't exist
-        if (spriteRenderer != null && spriteRenderer.sprite == null)
-        {
-            // Load sprite based on enemy type (from Resources or procedural fallback)
-            if (stats != null)
-                spriteRenderer.sprite = SpriteLoader.LoadEnemySprite(stats.enemyName, stats.color);
         }
         
         if (health == null)
@@ -203,12 +178,54 @@ public class Enemy : MonoBehaviour, ICollidable
         if (health != null && stats != null)
             health.Initialize(stats.maxHealth);
         
+        // CRITICAL: Always reload sprites for this enemy type (for pooled reuse)
+        // Get or add DirectionalSpriteController
+        directionController = GetComponent<DirectionalSpriteController>();
+        if (directionController == null)
+            directionController = gameObject.AddComponent<DirectionalSpriteController>();
+        
+        // Set sprite type based on enemy name (will look for Enemies/{enemyName}/)
+        string spriteFolder = $"Enemies/{stats.enemyName}";
+        DebugLog.Info($"[Enemy.Activate] Setting DirectionalSpriteController entity type to: {spriteFolder}");
+        directionController.SetEntityType(spriteFolder);
+        
+        // Set up AnimatedSpriteController for walking animation
+        animController = GetComponent<AnimatedSpriteController>();
+        if (animController == null)
+            animController = gameObject.AddComponent<AnimatedSpriteController>();
+        
+        animController.SetEntityType(stats.enemyName); // Use just enemy name, sprites at Resources/Sprites/{enemyName}/
+        animController.SetAnimation("walking-8-frames");
+        animController.LoadAllAnimations();
+        animController.Play();
+        DebugLog.Info($"[Enemy.Activate] AnimatedSpriteController configured for {stats.enemyName}/walking-8-frames");
+        
+        // Verify sprites loaded
+        if (spriteRenderer != null && spriteRenderer.sprite == null)
+        {
+            DebugLog.Error($"[Enemy] *** CRITICAL: DirectionalSpriteController FAILED to load sprites for {stats.enemyName} ***");
+            DebugLog.Error($"[Enemy] All enemies require PixelLab sprites in Resources/Sprites/Enemies/{stats.enemyName}/");
+            DebugLog.Error($"[Enemy] Generate using: mcp_pixellab_create_character(...)");
+            DebugLog.Error($"[Enemy] No sprites available for {stats.enemyName} - enemy will be invisible!");
+        }
+        else if (spriteRenderer != null && spriteRenderer.sprite != null)
+        {
+            DebugLog.Info($"[Enemy] Successfully loaded sprites for {stats.enemyName}: sprite={spriteRenderer.sprite.name}, PPU={spriteRenderer.sprite.pixelsPerUnit}");
+        }
+        
         // Apply visual properties from stats
         if (stats != null && spriteRenderer != null)
         {
             spriteRenderer.color = stats.color;
-            transform.localScale = Vector3.one * stats.scale;
-            DebugLog.Info($"Enemy activated: {stats.enemyName}, pos={position}, color={stats.color}, scale={stats.scale}, spriteColor={spriteRenderer.color}, sprite={spriteRenderer.sprite != null}");
+            
+            // Scale calculation: PixelLab sprites are 64×64@PPU32 = 2 units
+            // Use stats.scale directly without multiplier - let stats control size
+            float baseScale = stats.scale;
+            transform.localScale = Vector3.one * baseScale;
+            
+            // Log actual sprite PPU for debugging
+            float spritePPU = spriteRenderer.sprite != null ? spriteRenderer.sprite.pixelsPerUnit : 0;
+            DebugLog.Info($"Enemy activated: {stats.enemyName}, pos={position}, scale={baseScale} (stats.scale={stats.scale}), spritePPU={spritePPU}, localScale={transform.localScale}, sprite={spriteRenderer.sprite?.name}");
         }
         
         isActive = true;
@@ -258,6 +275,7 @@ public class Enemy : MonoBehaviour, ICollidable
     
     private void Update()
     {
+        if (GamePhaseManager.CurrentPhase != GamePhase.Gameplay) return;
         if (GameState.IsPaused) return;
         
         if (!isActive || playerTransform == null)
@@ -268,6 +286,17 @@ public class Enemy : MonoBehaviour, ICollidable
         // Move toward player using Rigidbody2D for proper physics collision
         Vector3 direction = (playerTransform.position - transform.position).normalized;
         float speed = stats != null ? stats.moveSpeed : 2f;
+        
+        // Update sprite direction using DirectionalSpriteController
+        if (directionController == null)
+        {
+            directionController = GetComponent<DirectionalSpriteController>();
+        }
+        
+        if (directionController != null && direction != Vector3.zero)
+        {
+            directionController.UpdateDirection(new Vector2(direction.x, direction.y));
+        }
         
         // Use Rigidbody2D.MovePosition for physics-aware movement
         if (rb != null)

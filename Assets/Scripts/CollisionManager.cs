@@ -14,6 +14,12 @@ public class CollisionManager : MonoBehaviour
     [SerializeField] private OrbiterManager orbiterManager;
     [SerializeField] private float playerCollisionRadius = 0.4f; // Match wizard body size
     
+    // Legacy direct reference for backward compatibility
+    private BoomerangWeapon boomerangWeapon;
+    
+    // New weapon registration system
+    private List<IWeaponCollisionHandler> registeredWeapons = new List<IWeaponCollisionHandler>();
+    
     [Header("Spatial Hash Grid Settings")]
     [Tooltip("Cell size for spatial partitioning (should be ~2x max collision radius)")]
     [SerializeField] private float gridCellSize = 2.0f;
@@ -31,6 +37,44 @@ public class CollisionManager : MonoBehaviour
     
     public bool IsGameOver => gameOver;
     
+    /// <summary>
+    /// Query enemies within a radius using spatial hash grid.
+    /// Much more efficient than checking all active enemies.
+    /// </summary>
+    public List<ICollidable> QueryNearbyEnemies(Vector3 position, float radius)
+    {
+        if (spatialGrid == null)
+        {
+            return new List<ICollidable>();
+        }
+        return spatialGrid.Query(position, radius, CollisionLayer.Enemy);
+    }
+    
+    /// <summary>
+    /// Register a weapon that handles its own collision detection.
+    /// Registered weapons will have CheckCollisions() called each frame.
+    /// </summary>
+    public void RegisterWeapon(IWeaponCollisionHandler weapon)
+    {
+        if (weapon != null && !registeredWeapons.Contains(weapon))
+        {
+            registeredWeapons.Add(weapon);
+            DebugLog.Info($"[CollisionManager] Registered weapon: {weapon.GetType().Name}");
+        }
+    }
+    
+    /// <summary>
+    /// Unregister a weapon from collision detection.
+    /// </summary>
+    public void UnregisterWeapon(IWeaponCollisionHandler weapon)
+    {
+        if (weapon != null && registeredWeapons.Contains(weapon))
+        {
+            registeredWeapons.Remove(weapon);
+            DebugLog.Info($"[CollisionManager] Unregistered weapon: {weapon.GetType().Name}");
+        }
+    }
+    
     private void Start()
     {
         // Initialize spatial hash grid
@@ -45,6 +89,40 @@ public class CollisionManager : MonoBehaviour
             {
                 DebugLog.Info("[CollisionManager] Auto-found OrbiterManager on same GameObject");
             }
+        }
+        
+        // Auto-register all weapons that implement IWeaponCollisionHandler
+        if (playerTransform != null)
+        {
+            // Register BoomerangWeapon
+            boomerangWeapon = playerTransform.GetComponent<BoomerangWeapon>();
+            if (boomerangWeapon != null)
+            {
+                RegisterWeapon(boomerangWeapon);
+            }
+            
+            // Register OrbiterWeapon
+            OrbiterWeapon orbiterWeapon = playerTransform.GetComponent<OrbiterWeapon>();
+            if (orbiterWeapon != null)
+            {
+                RegisterWeapon(orbiterWeapon);
+            }
+            
+            // Register ProjectileWeapon (handles shared projectile pool)
+            ProjectileWeapon projectileWeapon = playerTransform.GetComponent<ProjectileWeapon>();
+            if (projectileWeapon != null)
+            {
+                RegisterWeapon(projectileWeapon);
+            }
+            
+            // Register RapidFireWeapon (shares pool, but registration is needed for consistency)
+            RapidFireWeapon rapidFireWeapon = playerTransform.GetComponent<RapidFireWeapon>();
+            if (rapidFireWeapon != null)
+            {
+                RegisterWeapon(rapidFireWeapon);
+            }
+            
+            DebugLog.Info($"[CollisionManager] Registered {registeredWeapons.Count} weapons for collision detection");
         }
         
         DebugLog.Info($"[CollisionManager] Starting - orbiterManager={orbiterManager != null}, enemyPool={enemyPool != null}, projectilePool={projectilePool != null}");
@@ -82,14 +160,25 @@ public class CollisionManager : MonoBehaviour
     
     private void Update()
     {
+        // ONLY run collisions during gameplay phase
+        if (GamePhaseManager.CurrentPhase != GamePhase.Gameplay) return;
+        
         if (gameOver || GameState.IsPaused) return;
+        
+        // Safety check - spatial grid must be initialized
+        if (spatialGrid == null)
+        {
+            spatialGrid = new SpatialHashGrid(gridCellSize);
+        }
         
         // Populate spatial hash grid with all entities
         PopulateSpatialGrid();
         
         // Perform collision checks using grid
-        CheckProjectileEnemyCollisions();
-        CheckOrbiterEnemyCollisions();
+        // Check collisions for all registered weapons (new pattern - replaces old hard-coded methods)
+        CheckRegisteredWeaponCollisions();
+        
+        // Player collision still handled by CollisionManager (not weapon-specific)
         CheckPlayerEnemyCollisions();
     }
     
@@ -117,168 +206,19 @@ public class CollisionManager : MonoBehaviour
         // Only enemies need to be in the grid for efficient nearest-neighbor queries
     }
     
-    /// <summary>
-    /// Check all active projectiles against nearby enemies using spatial hash grid
-    /// </summary>
-    private void CheckProjectileEnemyCollisions()
-    {
-        if (projectilePool == null || enemyPool == null) return;
-        
-        // Create a copy to avoid collection modified exception when Deactivate() removes from list
-        List<Projectile> activeProjectiles = new List<Projectile>(projectilePool.GetActiveProjectiles());
-        
-        foreach (var projectile in activeProjectiles)
-        {
-            if (!projectile.IsActive)
-            {
-                DebugLog.Verbose($"[CheckProjectileCollisions] Skipping inactive projectile");
-                continue;
-            }
-            
-            DebugLog.Verbose($"[CheckProjectileCollisions] Checking projectile at ({projectile.Position.x:F2},{projectile.Position.y:F2}) damage={projectile.Damage:F1} pierce={projectile.Pierce} hits={projectile.EnemiesHit}");
-            
-            // Query spatial grid for nearby enemies
-            var nearbyEntities = spatialGrid.Query(
-                projectile.Position, 
-                projectile.CollisionRadius, 
-                CollisionLayer.Enemy
-            );
-            
-            foreach (var entity in nearbyEntities)
-            {
-                if (entity is Enemy enemy && enemy.gameObject.activeInHierarchy)
-                {
-                    float distance = Vector3.Distance(projectile.Position, enemy.Position);
-                    float combinedRadius = projectile.CollisionRadius + enemy.CollisionRadius;
-                    
-                    DebugLog.Verbose($"[CheckProjectileCollisions] Distance to {enemy.name}: {distance:F3} vs combinedRadius: {combinedRadius:F3}");
-                    
-                    if (distance < combinedRadius)
-                    {
-                        // Check if projectile has already hit this enemy (prevents double-hits on consecutive frames)
-                        int enemyID = enemy.gameObject.GetInstanceID();
-                        if (projectile.RegisterHit(enemyID))
-                        {
-                            // RegisterHit returns false if already hit this enemy
-                            // Only apply damage if this is a new hit
-                            Health enemyHealth = enemy.GetComponent<Health>();
-                            if (enemyHealth != null)
-                            {
-                                // Calculate damage with crits and player multipliers
-                                DamageContext context = new DamageContext
-                                {
-                                    baseDamage = projectile.Damage,
-                                    player = GameServices.Player,
-                                    enemy = enemy,
-                                    damageType = projectile.DamageType
-                                };
-                                
-                                DamageResult result = DamageCalculator.Instance.CalculateDamage(context);
-                                
-                                float healthBefore = enemyHealth.CurrentHealth;
-                                bool died = enemyHealth.TakeDamage(result.finalDamage);
-                                float healthAfter = enemyHealth.CurrentHealth;
-                                
-                                string critText = result.isCritical ? " CRIT!" : "";
-                                DebugLog.Info($"[PROJECTILE HIT] {enemy.name} - Damage={result.finalDamage:F1}{critText} HP: {healthBefore:F1}→{healthAfter:F1} Died={died} Pierce={projectile.Pierce} Hits={projectile.EnemiesHit}");
-                                
-                                // Show damage number (gold for crits)
-                                DamageNumberPool damagePool = GameServices.DamageNumberPool;
-                                if (damagePool != null)
-                                {
-                                    if (result.isCritical)
-                                        damagePool.ShowCriticalDamage(enemy.Position, result.finalDamage);
-                                    else
-                                        damagePool.ShowDamage(enemy.Position, result.finalDamage);
-                                }
-                            }
-                            
-                            // RegisterHit returns true if projectile should be deactivated (pierce exhausted)
-                            if (projectile.EnemiesHit > projectile.Pierce)
-                            {
-                                projectile.Deactivate();
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
+
     
     /// <summary>
-    /// Check all active orbiters against nearby enemies using spatial hash grid
+    /// Check collisions for all registered weapons using their own logic.
+    /// This is the new pattern - weapons handle their own collision detection.
     /// </summary>
-    private void CheckOrbiterEnemyCollisions()
+    private void CheckRegisteredWeaponCollisions()
     {
-        if (orbiterManager == null || enemyPool == null) return;
-        
-        List<OrbiterProjectile> activeOrbiters = orbiterManager.GetActiveOrbiters();
-        if (activeOrbiters == null || activeOrbiters.Count == 0) return;
-        
-        foreach (var orbiter in activeOrbiters)
+        foreach (var weapon in registeredWeapons)
         {
-            if (orbiter == null || !orbiter.IsActive) continue;
-            
-            // Query spatial grid for nearby enemies
-            var nearbyEntities = spatialGrid.Query(
-                orbiter.Position,
-                orbiter.CollisionRadius,
-                CollisionLayer.Enemy
-            );
-            
-            foreach (var entity in nearbyEntities)
+            if (weapon != null && weapon.IsActive)
             {
-                if (entity is Enemy enemy && enemy.gameObject.activeInHierarchy && enemy.IsActive)
-                {
-                    // Check if this orbiter can hit this enemy (not on cooldown)
-                    int enemyInstanceID = enemy.GetInstanceID();
-                    if (!orbiter.CanHitEnemy(enemyInstanceID))
-                        continue;
-                    
-                    float distance = Vector3.Distance(orbiter.Position, enemy.Position);
-                    float combinedRadius = orbiter.CollisionRadius + enemy.CollisionRadius;
-                    
-                    if (distance < combinedRadius)
-                    {
-                        Health enemyHealth = enemy.GetComponent<Health>();
-                        if (enemyHealth != null && enemyHealth.IsAlive)
-                        {
-                            DebugLog.Verbose($"[ORBITER HIT] Orbiter collided with enemy! Distance={distance:F3}, CombinedRadius={combinedRadius:F3}");
-                            
-                            // Calculate damage with crits and player multipliers
-                            DamageContext context = new DamageContext
-                            {
-                                baseDamage = orbiter.Damage,
-                                player = GameServices.Player,
-                                enemy = enemy,
-                                damageType = orbiter.DamageType
-                            };
-                            
-                            DamageResult result = DamageCalculator.Instance.CalculateDamage(context);
-                            
-                            float healthBefore = enemyHealth.CurrentHealth;
-                            bool died = enemyHealth.TakeDamage(result.finalDamage);
-                            float healthAfter = enemyHealth.CurrentHealth;
-                            
-                            string critText = result.isCritical ? " CRIT!" : "";
-                            DebugLog.Info($"[ORBITER HIT] {enemy.name} - Damage={result.finalDamage:F1}{critText} HP: {healthBefore:F1}→{healthAfter:F1} Died={died}");
-                            
-                            // Show damage number (gold for crits)
-                            DamageNumberPool damagePool = GameServices.DamageNumberPool;
-                            if (damagePool != null)
-                            {
-                                if (result.isCritical)
-                                    damagePool.ShowCriticalDamage(enemy.Position, result.finalDamage);
-                                else
-                                    damagePool.ShowDamage(enemy.Position, result.finalDamage);
-                            }
-                            
-                            // Record hit to prevent double-hitting same enemy
-                            orbiter.RecordHit(enemyInstanceID);
-                        }
-                    }
-                }
+                weapon.CheckCollisions(spatialGrid, enemyPool);
             }
         }
     }

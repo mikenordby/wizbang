@@ -3,9 +3,14 @@ using UnityEngine;
 /// <summary>
 /// Rapid-fire pistol weapon that shoots at nearest enemy at high speed.
 /// Low damage, high fire rate - spray and pray!
+/// Implements IWeaponCollisionHandler for self-managed collision detection.
 /// </summary>
-public class RapidFireWeapon : Weapon
+public class RapidFireWeapon : Weapon, IWeaponCollisionHandler
 {
+    [Header("Rapid Fire Settings")]
+    [Tooltip("Spread angle in degrees for bullet spread")]
+    [SerializeField] private float spreadAngle = 8f;
+    
     private ProjectilePool projectilePool;
     
     protected override void Awake()
@@ -17,9 +22,7 @@ public class RapidFireWeapon : Weapon
         projectileCount = 1;
         basePierce = 0; // No pierce by default
         baseRange = 0.8f; // Shorter range
-        spreadAngle = 8f; // Slight spread
-        projectileSpeed = 15f; // Faster bullets
-        projectileSize = 0.5f; // Smaller bullets
+        projectileSize = 0.7f; // Smaller bullets
         
         base.Awake();
         
@@ -66,7 +69,9 @@ public class RapidFireWeapon : Weapon
             // Spawn bullet
             bullet.transform.position = playerTransform.position;
             bullet.ActivateStraight(playerTransform.position, shootDir);
-            bullet.SetStats(currentDamage, currentPierce, DamageType.Physical);
+            
+            float finalSize = currentProjectileSize * (player != null ? player.ProjectileSizeMultiplier : 1f);
+            bullet.SetStats(currentDamage, currentPierce, DamageType.Physical, finalSize);
             
             // Make bullets yellow
             SpriteRenderer sr = bullet.GetComponent<SpriteRenderer>();
@@ -74,7 +79,6 @@ public class RapidFireWeapon : Weapon
             {
                 sr.sprite = SpriteLoader.LoadProjectileSprite("fireball");
                 sr.color = Color.yellow;
-                bullet.transform.localScale = Vector3.one * projectileSize; // Use weapon's projectileSize
             }
         }
         
@@ -104,4 +108,23 @@ public class RapidFireWeapon : Weapon
         
         return nearest != null ? nearest.transform : null;
     }
+    
+    #region IWeaponCollisionHandler Implementation
+    
+    /// <summary>
+    /// RapidFireWeapon shares the projectile pool with ProjectileWeapon.
+    /// We register but don't do collision checks here to avoid duplicate checks.
+    /// ProjectileWeapon handles collision detection for the shared pool.
+    /// </summary>
+    public void CheckCollisions(SpatialHashGrid grid, EnemyPool enemyPool)
+    {
+        // No-op: Collision detection handled by ProjectileWeapon for shared pool
+    }
+    
+    /// <summary>
+    /// Whether this weapon is active and should check collisions
+    /// </summary>
+    bool IWeaponCollisionHandler.IsActive => false; // Disable to avoid duplicate checks
+    
+    #endregion
 }

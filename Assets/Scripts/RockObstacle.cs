@@ -8,19 +8,21 @@ public class RockObstacle : MonoBehaviour
 {
     private SpriteRenderer spriteRenderer;
     private CircleCollider2D obstacleCollider;
+    private static Sprite rockSprite; // Cached sprite shared by all rocks
     
     private void Awake()
     {
         // Create sprite renderer
         spriteRenderer = gameObject.AddComponent<SpriteRenderer>();
-        spriteRenderer.sprite = CreateRockSprite();
+        spriteRenderer.sprite = LoadRockSprite();
         spriteRenderer.sortingOrder = 10; // Above projectiles (5) and grass (-100)
         
         // Create collision (physical, not trigger)
         // Rock sprite: 32px diameter at 16 PPU = 2 world units diameter = 1.0 radius
-        // Visual circle has radius 0.45 of sprite (14.4px) = 0.9 world units
+        // Visual rock is roughly 24-28px of usable space = 1.5-1.75 world units
+        // Reduce radius to match visible rock shape more closely
         obstacleCollider = gameObject.AddComponent<CircleCollider2D>();
-        obstacleCollider.radius = 0.9f; // Match visual rock radius exactly
+        obstacleCollider.radius = 0.75f; // Tighter fit to visible rock shape
         obstacleCollider.isTrigger = false; // Physical collision blocks movement
         
         // Set layer to Obstacles (will create if needed)
@@ -34,9 +36,31 @@ public class RockObstacle : MonoBehaviour
     }
     
     /// <summary>
-    /// Create a procedural rock sprite with grey texture and noise
+    /// Load rock sprite from Resources (PixelLab generated)
     /// </summary>
-    private Sprite CreateRockSprite()
+    private Sprite LoadRockSprite()
+    {
+        // Load cached sprite if available
+        if (rockSprite != null)
+        {
+            return rockSprite;
+        }
+        
+        // Load from Resources
+        rockSprite = Resources.Load<Sprite>("Sprites/Objects/rock_medium_mossy");
+        if (rockSprite == null)
+        {
+            DebugLog.Error("[RockObstacle] Failed to load rock_medium_mossy sprite from Resources");
+            rockSprite = CreateFallbackRockSprite();
+        }
+        
+        return rockSprite;
+    }
+    
+    /// <summary>
+    /// Create a fallback procedural rock sprite with grey texture and noise
+    /// </summary>
+    private Sprite CreateFallbackRockSprite()
     {
         int resolution = 32;
         Texture2D texture = new Texture2D(resolution, resolution);

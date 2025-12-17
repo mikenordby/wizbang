@@ -18,4 +18,4 @@ MonoBehaviour:
   moveSpeed: 2.5
   xpDrop: 3
   color: {r: 0.9, g: 0.9, b: 0.9, a: 1}
-  scale: 1.4
+  scale: 1.0

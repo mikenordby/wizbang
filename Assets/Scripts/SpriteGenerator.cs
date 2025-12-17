@@ -108,7 +108,7 @@ public static class SpriteGenerator
     /// <summary>
     /// Finalize texture and create sprite
     /// </summary>
-    private static Sprite FinalizeSprite(Texture2D texture, Color[] pixels, int size, float pixelsPerUnit = 128)
+    private static Sprite FinalizeSprite(Texture2D texture, Color[] pixels, int size, float pixelsPerUnit = 32)
     {
         texture.SetPixels(pixels);
         texture.filterMode = FilterMode.Point; // Pixel-perfect rendering

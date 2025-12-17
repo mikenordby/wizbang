@@ -37,7 +37,12 @@ public class LevelUpUI : MonoBehaviour
         }
         
         CreateUI();
-        HideUI();
+        // Don't call HideUI() in Awake - it unpauses the game and interferes with character selection
+        // Panel is already inactive by default when created
+        if (levelUpPanel != null)
+        {
+            levelUpPanel.SetActive(false);
+        }
     }
     
     private void CreateUI()
@@ -250,7 +255,12 @@ public class LevelUpUI : MonoBehaviour
         // Update reroll button
         UpdateRerollButton();
         
-        GameState.SetPaused(true);
+        // Only pause if we're in gameplay phase
+        if (GamePhaseManager.CurrentPhase == GamePhase.Gameplay)
+        {
+            GameState.SetPaused(true);
+        }
+        
         DebugLog.Info($"[LevelUpUI] Showing {currentChoices.Count} upgrade choices");
     }
     
@@ -306,8 +316,15 @@ public class LevelUpUI : MonoBehaviour
     {
         if (levelUpPanel != null)
         {
+            // Only unpause if panel was actually visible (not initial hide on startup)
+            bool wasVisible = levelUpPanel.activeSelf;
             levelUpPanel.SetActive(false);
-            GameState.SetPaused(false);
+            
+            // Only unpause if we were visible AND in gameplay phase
+            if (wasVisible && GamePhaseManager.CurrentPhase == GamePhase.Gameplay)
+            {
+                GameState.SetPaused(false);
+            }
         }
     }
 }

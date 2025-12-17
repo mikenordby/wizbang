@@ -10,7 +10,7 @@ public class OrbiterProjectile : BaseProjectile, ICollidable
     [SerializeField] private float orbitRadius = 2f;
     [SerializeField] private float orbitSpeed = 5f; // Increased from 2f to 5f - Radians per second
     [SerializeField] private float respawnDelay = 2f;
-    [SerializeField] private float hitCooldown = 0.5f; // Time before can hit same enemy again
+    private float hitCooldown = 0.5f; // Dynamic: set by weapon based on fire rate (1 / fireRate)
     
     private Transform playerTransform;
     private OrbiterManager orbiterManager;
@@ -47,6 +47,12 @@ public class OrbiterProjectile : BaseProjectile, ICollidable
     public void SetDamage(float newDamage) => damage = newDamage;
     public void SetOrbitSpeed(float speed) => orbitSpeed = speed;
     public void SetOrbitRadius(float radius) => orbitRadius = radius;
+    public void SetHitCooldown(float cooldown) => hitCooldown = cooldown;
+    public void SetSize(float sizeMultiplier)
+    {
+        size = sizeMultiplier;
+        transform.localScale = Vector3.one * size;
+    }
     
     public override void Deactivate()
     {

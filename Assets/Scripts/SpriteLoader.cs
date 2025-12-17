@@ -8,7 +8,6 @@ using System.Collections.Generic;
 public static class SpriteLoader
 {
     private static Dictionary<string, Sprite> spriteCache = new Dictionary<string, Sprite>(32);
-    private static bool useProceduralFallback = true;
     
     /// <summary>
     /// Load a sprite from Resources folder with caching
@@ -21,10 +20,8 @@ public static class SpriteLoader
         if (spriteCache.TryGetValue(path, out Sprite cached))
         {
             if (cached != null) return cached;
-            
             // Cached null means we already tried and failed - don't retry
-            if (!useProceduralFallback)
-                return null;
+            return null;
         }
         
         // Try to load from Resources/Sprites/
@@ -45,91 +42,63 @@ public static class SpriteLoader
     }
     
     /// <summary>
-    /// Load wizard sprite with procedural fallback
+    /// Load character sprite by direction (for 4-directional movement)
     /// </summary>
-    public static Sprite LoadWizardSprite()
+    public static Sprite LoadCharacterSprite(string characterName, Direction direction)
     {
-        Sprite sprite = LoadSprite("Player/wizard");
+        string directionName = direction.ToString().ToLower(); // "north", "south", "east", "west"
+        string path = $"{characterName}/{directionName}";
         
-        // Fallback to procedural generation if asset not found
-        if (sprite == null && useProceduralFallback)
+        Sprite sprite = LoadSprite(path);
+        
+        if (sprite == null)
         {
-            DebugLog.Info("[SpriteLoader] Using procedural wizard sprite (512px) as fallback");
-            sprite = SpriteGenerator.CreateWizardSprite();
-            if (sprite != null)
-            {
-                DebugLog.Info($"[SpriteLoader] Generated wizard sprite: {sprite.texture.width}x{sprite.texture.height}px, PPU={sprite.pixelsPerUnit}");
-            }
-        }
-        else if (sprite != null)
-        {
-            DebugLog.Info($"[SpriteLoader] Loaded wizard sprite from Resources: {sprite.texture.width}x{sprite.texture.height}px, PPU={sprite.pixelsPerUnit}");
+            DebugLog.Verbose($"[SpriteLoader] Loaded PixelLab {characterName} sprite: {directionName}");
         }
         
         return sprite;
     }
     
     /// <summary>
-    /// Load knight sprite with procedural fallback
+    /// Load character sprite by 8-directional name (for 8-directional movement)
     /// </summary>
-    public static Sprite LoadKnightSprite()
+    public static Sprite LoadCharacterSprite(string characterName, string directionName)
     {
-        Sprite sprite = LoadSprite("Player/knight");
+        string path = $"{characterName}/{directionName}";
         
-        // Fallback to procedural generation if asset not found
-        if (sprite == null && useProceduralFallback)
+        Sprite sprite = LoadSprite(path);
+        
+        if (sprite == null)
         {
-            DebugLog.Info("[SpriteLoader] Using procedural knight sprite as fallback");
-            sprite = SpriteGenerator.CreateKnightSprite();
-            if (sprite != null)
-            {
-                DebugLog.Info($"[SpriteLoader] Generated knight sprite: {sprite.texture.width}x{sprite.texture.height}px, PPU={sprite.pixelsPerUnit}");
-            }
+            DebugLog.Error($"[SpriteLoader] FAILED to load sprite: Resources/Sprites/{path}");
         }
-        else if (sprite != null)
+        else
         {
-            DebugLog.Info($"[SpriteLoader] Loaded knight sprite from Resources: {sprite.texture.width}x{sprite.texture.height}px, PPU={sprite.pixelsPerUnit}");
+            DebugLog.Info($"[SpriteLoader] ✓ Loaded: Resources/Sprites/{path} ({sprite.rect.width}x{sprite.rect.height}px, PPU={sprite.pixelsPerUnit})");
         }
         
         return sprite;
     }
     
+
+    
     /// <summary>
-    /// Load enemy sprite with procedural fallback
+    /// Load enemy sprite - requires PixelLab sprites
     /// </summary>
     public static Sprite LoadEnemySprite(string enemyName, Color color)
     {
-        // Try to load asset first
+        // All enemies now require PixelLab sprites - no procedural fallback
         string path = $"Enemies/{enemyName.ToLower()}";
         Sprite sprite = LoadSprite(path);
         
-        // Fallback to procedural generation
-        if (sprite == null && useProceduralFallback)
+        if (sprite == null)
         {
-            DebugLog.Info($"[SpriteLoader] Using procedural {enemyName} sprite as fallback");
-            
-            string lowerName = enemyName.ToLower();
-            if (lowerName.Contains("goblin"))
-                sprite = SpriteGenerator.CreateGoblinSprite(color);
-            else if (lowerName.Contains("skeleton"))
-                sprite = SpriteGenerator.CreateSkeletonSprite(color);
-            else if (lowerName.Contains("ogre"))
-                sprite = SpriteGenerator.CreateOgreSprite(color);
-            else if (lowerName.Contains("dragon"))
-                sprite = SpriteGenerator.CreateDragonSprite(color);
-            else if (lowerName.Contains("blob") || lowerName.Contains("slime"))
-                sprite = SpriteGenerator.CreateGoblinSprite(color); // Redirect blob to goblin
-            else
-                sprite = SpriteGenerator.CreateGoblinSprite(color); // Default fallback
-            
-            if (sprite != null)
-            {
-                DebugLog.Info($"[SpriteLoader] Generated {enemyName} sprite: {sprite.texture.width}x{sprite.texture.height}px, PPU={sprite.pixelsPerUnit}");
-            }
+            DebugLog.Error($"[SpriteLoader] CRITICAL: Failed to load enemy sprite for {enemyName} from Resources/Sprites/{path}!");
+            DebugLog.Error($"[SpriteLoader] All enemies require PixelLab sprites. Generate sprites using PixelLab and place in Resources/Sprites/Enemies/{enemyName}/");
         }
-        else if (sprite != null)
+        else
         {
-            DebugLog.Info($"[SpriteLoader] Loaded {enemyName} sprite from Resources: {sprite.texture.width}x{sprite.texture.height}px, PPU={sprite.pixelsPerUnit}");
+            DebugLog.Info($"[SpriteLoader] Loaded {enemyName} sprite: {sprite.texture.width}x{sprite.texture.height}px, PPU={sprite.pixelsPerUnit}");
         }
         
         return sprite;
@@ -143,7 +112,7 @@ public static class SpriteLoader
         string path = $"Projectiles/{projectileName.ToLower()}";
         Sprite sprite = LoadSprite(path);
         
-        if (sprite == null && useProceduralFallback)
+        if (sprite == null)
         {
             DebugLog.Verbose($"[SpriteLoader] Using procedural {projectileName} sprite as fallback");
             sprite = SpriteGenerator.CreateFireballSprite();
@@ -153,13 +122,21 @@ public static class SpriteLoader
     }
     
     /// <summary>
+    /// Load fireball projectile sprite with procedural fallback
+    /// </summary>
+    public static Sprite LoadFireballSprite()
+    {
+        return LoadProjectileSprite("fireball");
+    }
+    
+    /// <summary>
     /// Load orbiter projectile sprite with procedural fallback
     /// </summary>
     public static Sprite LoadOrbiterSprite()
     {
         Sprite sprite = LoadSprite("Projectiles/orbiter");
         
-        if (sprite == null && useProceduralFallback)
+        if (sprite == null)
         {
             DebugLog.Verbose("[SpriteLoader] Using procedural orbiter sprite as fallback");
             sprite = SpriteGenerator.CreateOrbiterSprite();
@@ -175,7 +152,7 @@ public static class SpriteLoader
     {
         Sprite sprite = LoadSprite("Projectiles/boomerang");
         
-        if (sprite == null && useProceduralFallback)
+        if (sprite == null)
         {
             DebugLog.Verbose("[SpriteLoader] Using procedural boomerang sprite as fallback");
             sprite = SpriteGenerator.CreateBoomerangSprite();
@@ -191,7 +168,7 @@ public static class SpriteLoader
     {
         Sprite sprite = LoadSprite("Effects/xp_gem");
         
-        if (sprite == null && useProceduralFallback)
+        if (sprite == null)
         {
             DebugLog.Verbose("[SpriteLoader] Using procedural XP gem sprite as fallback");
             sprite = SpriteGenerator.CreateXPGemSprite();
@@ -230,14 +207,5 @@ public static class SpriteLoader
         }
         
         DebugLog.Info($"[SpriteLoader] Cache: {loadedCount} sprites loaded, {memoryBytes / 1024}KB memory");
-    }
-    
-    /// <summary>
-    /// Enable or disable procedural generation fallback
-    /// </summary>
-    public static void SetProceduralFallback(bool enabled)
-    {
-        useProceduralFallback = enabled;
-        DebugLog.Info($"[SpriteLoader] Procedural fallback: {(enabled ? "ENABLED" : "DISABLED")}");
     }
 }

@@ -22,6 +22,7 @@ public class XPOrb : MonoBehaviour
     
     void Update()
     {
+        if (GamePhaseManager.CurrentPhase != GamePhase.Gameplay) return;
         if (GameState.IsPaused) return;
         
         if (!isActive || playerTransform == null)

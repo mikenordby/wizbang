@@ -51,6 +51,9 @@ public class EnemySpawner : MonoBehaviour
     
     private void Update()
     {
+        // ONLY spawn enemies during gameplay phase
+        if (GamePhaseManager.CurrentPhase != GamePhase.Gameplay) return;
+        
         if (enemyPool == null || player == null || GameState.IsPaused) return;
         
         // Track game time and scale spawn rate (doubles every minute)

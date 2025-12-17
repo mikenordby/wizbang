@@ -86,7 +86,8 @@ public class BoomerangProjectile : BaseProjectile, ICollidable
             if (travelDistance >= maxDistance)
             {
                 isReturning = true;
-                DebugLog.Verbose("[BoomerangProjectile] Starting return journey");
+                ClearHitList(); // Reset hit tracking so we can damage enemies again on return trip
+                DebugLog.Verbose("[BoomerangProjectile] Starting return journey - hit list cleared");
             }
         }
         else

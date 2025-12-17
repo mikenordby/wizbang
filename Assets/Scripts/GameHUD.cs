@@ -44,6 +44,9 @@ public class GameHUD : MonoBehaviour
     
     private void Update()
     {
+        // Only track time during active gameplay
+        if (GamePhaseManager.CurrentPhase != GamePhase.Gameplay) return;
+        
         if (!GameState.IsPaused)
             gameTime += Time.deltaTime;
     }
@@ -87,6 +90,9 @@ public class GameHUD : MonoBehaviour
     
     private void OnGUI()
     {
+        // Only show HUD during active gameplay
+        if (GamePhaseManager.CurrentPhase != GamePhase.Gameplay) return;
+        
         if (player == null) return;
         
         // Re-initialize styles if needed (lost on hot reload)
@@ -165,18 +171,28 @@ public class GameHUD : MonoBehaviour
     
     private void DrawDebugInfo()
     {
-        // Debug info (top right, below level)
-        int activeEnemies = enemyPool != null ? enemyPool.GetActiveCount() : 0;
+        // FPS counter (top left, below health/XP bars)
         float fps = 1f / Time.deltaTime;
         
-        string debugText = $"FPS: {fps:F0}\n";
-        debugText += $"Enemies: {activeEnemies}\n";
-        debugText += $"Damage: {player.DamageMultiplier:F2}x\n";
-        debugText += $"Crit: {player.CritChance * 100:F0}%\n";
-        debugText += $"Speed: {player.MoveSpeedMultiplier:F2}x";
+        string fpsText = $"FPS: {fps:F0}";
         
-        Rect debugRect = new Rect(Screen.width - 220, 70, 200, 150);
-        GUI.Label(debugRect, debugText, debugStyle);
+        // Position below the XP bar (health at 20, XP at 60, so FPS at 95)
+        Rect fpsRect = new Rect(20, 95, 200, 30);
+        GUI.Label(fpsRect, fpsText, debugStyle);
+        
+        // Other debug info (top right, below level) - optional
+        if (showDebugInfo)
+        {
+            int activeEnemies = enemyPool != null ? enemyPool.GetActiveCount() : 0;
+            
+            string debugText = $"Enemies: {activeEnemies}\n";
+            debugText += $"Damage: {player.DamageMultiplier:F2}x\n";
+            debugText += $"Crit: {player.CritChance * 100:F0}%\n";
+            debugText += $"Speed: {player.MoveSpeedMultiplier:F2}x";
+            
+            Rect debugRect = new Rect(Screen.width - 220, 70, 200, 150);
+            GUI.Label(debugRect, debugText, debugStyle);
+        }
     }
     
     /// <summary>

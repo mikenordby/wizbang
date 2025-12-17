@@ -1,0 +1,341 @@
+using UnityEngine;
+using System.Collections.Generic;
+
+/// <summary>
+/// Handles frame-based sprite animations for 8-directional characters
+/// Loads animation frames from Resources/Sprites/{entityType}/walking/
+/// </summary>
+public class AnimatedSpriteController : MonoBehaviour
+{
+    [Header("Animation Settings")]
+    [SerializeField] private string entityType; // "PlayerWizard", "Enemies/Goblin", etc.
+    [SerializeField] private string animationName = "walking"; // "walking", "idle", etc.
+    [SerializeField] private float framesPerSecond = 10f;
+    [SerializeField] private bool playOnStart = false;
+    
+    [Header("References")]
+    [SerializeField] private SpriteRenderer spriteRenderer;
+    
+    // Animation state
+    private bool isPlaying = false;
+    private Direction8 currentDirection = Direction8.South;
+    private int currentFrame = 0;
+    private float frameTimer = 0f;
+    
+    // Cached animation data
+    private Dictionary<Direction8, Sprite[]> animationCache = new Dictionary<Direction8, Sprite[]>();
+    private bool isInitialized = false;
+    
+    void Awake()
+    {
+        if (spriteRenderer == null)
+        {
+            spriteRenderer = GetComponent<SpriteRenderer>();
+        }
+    }
+    
+    void Start()
+    {
+        if (playOnStart)
+        {
+            LoadAllAnimations();
+            Play();
+        }
+    }
+    
+    void Update()
+    {
+        if (!isPlaying || !isInitialized)
+            return;
+        
+        // Update frame timer
+        frameTimer += Time.deltaTime;
+        float frameDuration = 1f / framesPerSecond;
+        
+        if (frameTimer >= frameDuration)
+        {
+            frameTimer -= frameDuration;
+            AdvanceFrame();
+        }
+    }
+    
+    public void SetEntityType(string type)
+    {
+        entityType = type;
+        isInitialized = false;
+    }
+    
+    public void SetAnimation(string animation)
+    {
+        animationName = animation;
+        isInitialized = false;
+    }
+    
+    /// <summary>
+    /// Load all animation frames for all 8 directions
+    /// </summary>
+    public void LoadAllAnimations()
+    {
+        if (string.IsNullOrEmpty(entityType))
+        {
+            DebugLog.Warning($"[AnimatedSpriteController] EntityType not set, cannot load animations");
+            return;
+        }
+        
+        animationCache.Clear();
+        
+        Direction8[] directions = new Direction8[]
+        {
+            Direction8.South,
+            Direction8.SouthWest,
+            Direction8.West,
+            Direction8.NorthWest,
+            Direction8.North,
+            Direction8.NorthEast,
+            Direction8.East,
+            Direction8.SouthEast
+        };
+        
+        int loadedDirections = 0;
+        foreach (Direction8 dir in directions)
+        {
+            Sprite[] frames = LoadAnimationFrames(dir);
+            if (frames != null && frames.Length > 0)
+            {
+                animationCache[dir] = frames;
+                loadedDirections++;
+                DebugLog.Info($"[AnimatedSpriteController] Loaded {frames.Length} frames for {entityType}/{animationName}/{GetDirectionName(dir)}");
+            }
+        }
+        
+        if (loadedDirections > 0)
+        {
+            isInitialized = true;
+            currentFrame = 0;
+            UpdateSprite();
+            DebugLog.Info($"[AnimatedSpriteController] Successfully loaded {loadedDirections}/8 directions for {entityType}/{animationName}");
+        }
+        else
+        {
+            DebugLog.Warning($"[AnimatedSpriteController] No animation frames found for {entityType}/{animationName}");
+        }
+    }
+    
+    /// <summary>
+    /// Load all frames for a specific direction
+    /// Expects naming: {direction}_frame_0.png, {direction}_frame_1.png, etc.
+    /// </summary>
+    private Sprite[] LoadAnimationFrames(Direction8 direction)
+    {
+        string dirName = GetDirectionName(direction);
+        
+        // Path format: Enemies/{entityType}/animations/{animationName}/{direction}/frame_XXX
+        // entityType should be lowercase (e.g., "skeleton", not "Skeleton")
+        string entityTypeLower = entityType.ToLower();
+        string basePath = $"Enemies/{entityTypeLower}/animations/{animationName}/{dirName}";
+        
+        DebugLog.Info($"[AnimatedSpriteController] Loading frames from: {basePath}/frame_XXX");
+        
+        // Try to load frames - keep loading until we hit a missing frame
+        List<Sprite> frames = new List<Sprite>();
+        int frameIndex = 0;
+        const int maxFrames = 20; // Safety limit
+        
+        while (frameIndex < maxFrames)
+        {
+            // Frame naming: frame_000.png, frame_001.png, etc.
+            string framePath = $"{basePath}/frame_{frameIndex:D3}";
+            Sprite frame = SpriteLoader.LoadSprite(framePath);
+            
+            if (frame == null)
+            {
+                // No more frames for this direction
+                if (frameIndex == 0)
+                {
+                    DebugLog.Warning($"[AnimatedSpriteController] No frames found at {framePath}");
+                }
+                break;
+            }
+            
+            frames.Add(frame);
+            frameIndex++;
+        }
+        
+        if (frames.Count > 0)
+        {
+            DebugLog.Info($"[AnimatedSpriteController] Loaded {frames.Count} frames from {basePath}");
+            return frames.ToArray();
+        }
+        
+        DebugLog.Warning($"[AnimatedSpriteController] No frames loaded from {basePath}");
+        return null;
+    }
+    
+    /// <summary>
+    /// Start playing the animation
+    /// </summary>
+    public void Play()
+    {
+        if (!isInitialized)
+        {
+            LoadAllAnimations();
+        }
+        
+        if (isInitialized)
+        {
+            isPlaying = true;
+            currentFrame = 0;
+            frameTimer = 0f;
+            UpdateSprite();
+        }
+    }
+    
+    /// <summary>
+    /// Stop playing the animation
+    /// </summary>
+    public void Stop()
+    {
+        isPlaying = false;
+        currentFrame = 0;
+        frameTimer = 0f;
+    }
+    
+    /// <summary>
+    /// Pause the animation at current frame
+    /// </summary>
+    public void Pause()
+    {
+        isPlaying = false;
+    }
+    
+    /// <summary>
+    /// Resume playing from current frame
+    /// </summary>
+    public void Resume()
+    {
+        if (isInitialized)
+        {
+            isPlaying = true;
+        }
+    }
+    
+    /// <summary>
+    /// Update the current direction and display appropriate sprite
+    /// </summary>
+    public void UpdateDirection(Vector2 moveDirection)
+    {
+        if (moveDirection == Vector2.zero)
+            return;
+        
+        Direction8 newDirection = GetDirection8(moveDirection);
+        
+        if (newDirection != currentDirection)
+        {
+            currentDirection = newDirection;
+            currentFrame = 0; // Reset to first frame when changing direction
+            frameTimer = 0f;
+            UpdateSprite();
+        }
+    }
+    
+    /// <summary>
+    /// Advance to next frame in the animation
+    /// </summary>
+    private void AdvanceFrame()
+    {
+        if (!animationCache.ContainsKey(currentDirection))
+            return;
+        
+        Sprite[] frames = animationCache[currentDirection];
+        if (frames.Length == 0)
+            return;
+        
+        currentFrame = (currentFrame + 1) % frames.Length;
+        UpdateSprite();
+    }
+    
+    /// <summary>
+    /// Update the sprite renderer with current frame
+    /// </summary>
+    private void UpdateSprite()
+    {
+        if (spriteRenderer == null || !isInitialized)
+            return;
+        
+        if (!animationCache.ContainsKey(currentDirection))
+        {
+            DebugLog.Warning($"[AnimatedSpriteController] No animation cached for direction {currentDirection}");
+            return;
+        }
+        
+        Sprite[] frames = animationCache[currentDirection];
+        if (frames.Length == 0)
+            return;
+        
+        // Clamp frame index
+        currentFrame = Mathf.Clamp(currentFrame, 0, frames.Length - 1);
+        
+        spriteRenderer.sprite = frames[currentFrame];
+    }
+    
+    /// <summary>
+    /// Convert Direction8 enum to folder name (uses underscores)
+    /// </summary>
+    private string GetDirectionName(Direction8 direction)
+    {
+        switch (direction)
+        {
+            case Direction8.South: return "south";
+            case Direction8.SouthWest: return "south-west";
+            case Direction8.West: return "west";
+            case Direction8.NorthWest: return "north-west";
+            case Direction8.North: return "north";
+            case Direction8.NorthEast: return "north-east";
+            case Direction8.East: return "east";
+            case Direction8.SouthEast: return "south-east";
+            default: return "south";
+        }
+    }
+    
+    /// <summary>
+    /// Convert a 2D movement vector into an 8-directional heading
+    /// </summary>
+    private Direction8 GetDirection8(Vector2 direction)
+    {
+        float angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
+        
+        // Normalize to 0-360
+        if (angle < 0) angle += 360;
+        
+        // Map angles to 8 directions
+        // East = 0°, North = 90°, West = 180°, South = 270°
+        if (angle >= 337.5f || angle < 22.5f)
+            return Direction8.East;
+        else if (angle >= 22.5f && angle < 67.5f)
+            return Direction8.NorthEast;
+        else if (angle >= 67.5f && angle < 112.5f)
+            return Direction8.North;
+        else if (angle >= 112.5f && angle < 157.5f)
+            return Direction8.NorthWest;
+        else if (angle >= 157.5f && angle < 202.5f)
+            return Direction8.West;
+        else if (angle >= 202.5f && angle < 247.5f)
+            return Direction8.SouthWest;
+        else if (angle >= 247.5f && angle < 292.5f)
+            return Direction8.South;
+        else // 292.5f to 337.5f
+            return Direction8.SouthEast;
+    }
+    
+    // Public getters
+    public bool IsPlaying => isPlaying;
+    public bool IsInitialized => isInitialized;
+    public Direction8 CurrentDirection => currentDirection;
+    public int CurrentFrame => currentFrame;
+    public int GetFrameCount(Direction8 direction)
+    {
+        if (animationCache.ContainsKey(direction))
+            return animationCache[direction].Length;
+        return 0;
+    }
+}

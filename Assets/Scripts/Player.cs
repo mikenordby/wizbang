@@ -76,10 +76,16 @@ public class Player : MonoBehaviour, ICollidable
     [Tooltip("Projectile duration/range multiplier")]
     [SerializeField] private float rangeMultiplier = 1f;
     
+    [Tooltip("Projectile visual and hitbox size multiplier")]
+    [SerializeField] private float projectileSizeMultiplier = 1f;
+    
     [Header("Runtime Stats")]
     [SerializeField] private int enemiesKilled = 0;
     [SerializeField] private float damageDealt = 0f;
     [SerializeField] private float damageTaken = 0f;
+    
+    // Component references
+    private DirectionalSpriteController directionController;
     
     // Properties for easy access
     public int CurrentLevel => currentLevel;
@@ -107,6 +113,7 @@ public class Player : MonoBehaviour, ICollidable
     public int BonusProjectiles => bonusProjectiles;
     public float AOEMultiplier => aoeMultiplier;
     public float RangeMultiplier => rangeMultiplier;
+    public float ProjectileSizeMultiplier => projectileSizeMultiplier;
     
     public int EnemiesKilled => enemiesKilled;
     public float DamageDealt => damageDealt;
@@ -155,23 +162,48 @@ public class Player : MonoBehaviour, ICollidable
             movement.SetMoveSpeedModifier(character.moveSpeedModifier);
         }
         
-        // Load character sprite
+        // Set up SpriteRenderer first
         SpriteRenderer sr = GetComponent<SpriteRenderer>();
         if (sr == null)
             sr = gameObject.AddComponent<SpriteRenderer>();
         
-        sr.sprite = LoadCharacterSprite(character.spriteType);
         sr.color = character.characterColor;
         sr.sortingOrder = 10; // Above ground and projectiles
-        transform.localScale = Vector3.one * 2.0f * character.characterScale;
+        
+        // Set up DirectionalSpriteController (8-directional sprites)
+        directionController = GetComponent<DirectionalSpriteController>();
+        if (directionController == null)
+            directionController = gameObject.AddComponent<DirectionalSpriteController>();
+        
+        // Set entity type and let controller load sprites
+        DebugLog.Info($"[Player] Setting sprite type: '{character.spriteType}'");
+        directionController.SetEntityType(character.spriteType);
+        
+        // Set up AnimatedSpriteController for walking animation
+        AnimatedSpriteController animController = GetComponent<AnimatedSpriteController>();
+        if (animController == null)
+            animController = gameObject.AddComponent<AnimatedSpriteController>();
+        
+        animController.SetEntityType(character.spriteType);
+        animController.SetAnimation("walking");
+        animController.LoadAllAnimations();
+        DebugLog.Info($"[Player] AnimatedSpriteController configured for {character.spriteType}/walking");
+        
+        // Scale adjustment: PixelLab wizard is 96×96@PPU32 = 3 units, procedural is 128×128@PPU128 = 1 unit
+        // To maintain similar visual size: scale by PPU ratio
+        float ppu = sr.sprite != null ? sr.sprite.pixelsPerUnit : 32f; // Default to 32 for PixelLab
+        float scaleMultiplier = ppu <= 32f ? 1.0f : 2.0f; // PixelLab sprites now at proper scale
+        transform.localScale = Vector3.one * scaleMultiplier * character.characterScale;
         
         if (sr.sprite != null)
         {
-            DebugLog.Info($"Player.InitializeWithCharacter: {character.characterName} sprite loaded - Size: {sr.sprite.texture.width}x{sr.sprite.texture.height}px");
+            DebugLog.Info($"[Player] ✓ {character.characterName} sprite: {sr.sprite.name}, Size: {sr.sprite.texture.width}x{sr.sprite.texture.height}px, PPU={ppu}, Scale={scaleMultiplier}");
+            DebugLog.Info($"[Player] SpriteRenderer: enabled={sr.enabled}, color={sr.color}, sortingLayer={sr.sortingLayerName}, sortingOrder={sr.sortingOrder}");
+            DebugLog.Info($"[Player] GameObject: active={gameObject.activeSelf}, position={transform.position}, scale={transform.localScale}, layer={gameObject.layer}");
         }
         else
         {
-            DebugLog.Error($"Player.InitializeWithCharacter: Failed to load {character.spriteType} sprite!");
+            DebugLog.Error($"[Player] ✗ SpriteRenderer.sprite is NULL! Failed to load {character.spriteType}");
         }
         
         // Add starting weapon
@@ -193,19 +225,28 @@ public class Player : MonoBehaviour, ICollidable
     }
     
     /// <summary>
-    /// Load character sprite based on type
+    /// Load character sprite from PixelLab assets
     /// </summary>
     private Sprite LoadCharacterSprite(string spriteType)
     {
+        // All characters now use PixelLab 8-directional sprites
+        // Load the south-facing sprite as default
+        return SpriteLoader.LoadCharacterSprite(spriteType, "south");
+    }
+    
+    private Sprite LoadCharacterSpriteFallback(string spriteType)
+    {
+        // Fallback for legacy code - try south direction
         switch (spriteType.ToLower())
         {
             case "wizard":
-                return SpriteLoader.LoadWizardSprite();
+            case "playerwizard":
+                return SpriteLoader.LoadCharacterSprite("PlayerWizard", "south");
             case "knight":
-                return SpriteLoader.LoadKnightSprite();
+                return SpriteLoader.LoadCharacterSprite("knight", "south");
             default:
                 DebugLog.Warning($"[Player] Unknown sprite type '{spriteType}', defaulting to wizard");
-                return SpriteLoader.LoadWizardSprite();
+                return SpriteLoader.LoadCharacterSprite("PlayerWizard", "south");
         }
     }
     

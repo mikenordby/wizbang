@@ -26,4 +26,4 @@ MonoBehaviour:
   healthRegen: 0
   characterColor: {r: 0.3, g: 0.5, b: 1, a: 1}
   characterScale: 1
-  spriteType: wizard
+  spriteType: PlayerWizard

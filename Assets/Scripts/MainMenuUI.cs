@@ -19,11 +19,11 @@ public class MainMenuUI : MonoBehaviour
             CreateMainMenuUI();
         }
         
-        // Pause game on start
-        Time.timeScale = 0f;
+        // Set phase to MainMenu (don't use Time.timeScale anymore)
+        GamePhaseManager.TransitionToMainMenu();
         isShowingMenu = true;
         
-        DebugLog.Info("[MainMenu] Game paused, waiting for Play button");
+        DebugLog.Info("[MainMenu] Showing main menu, waiting for Play button");
     }
     
     private void CreateMainMenuUI()
@@ -141,7 +141,7 @@ public class MainMenuUI : MonoBehaviour
     
     private void OnPlayButtonClicked()
     {
-        DebugLog.Info("[MainMenu] Play button clicked, starting game!");
+        DebugLog.Info("[MainMenu] Play button clicked, transitioning to character selection");
         
         // Hide menu
         if (menuPanel != null)
@@ -149,8 +149,8 @@ public class MainMenuUI : MonoBehaviour
             menuPanel.SetActive(false);
         }
         
-        // Unpause game
-        Time.timeScale = 1f;
+        // Transition to character selection phase
+        GamePhaseManager.TransitionToCharacterSelection();
         isShowingMenu = false;
         
         // Destroy this menu (one-time use)

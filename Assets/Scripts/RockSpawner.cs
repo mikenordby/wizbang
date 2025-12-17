@@ -43,6 +43,9 @@ public class RockSpawner : MonoBehaviour
     
     private void Update()
     {
+        // Only spawn rocks during active gameplay
+        if (GamePhaseManager.CurrentPhase != GamePhase.Gameplay) return;
+        
         if (player == null) return;
         
         Vector2Int playerChunk = GetChunkCoord(player.position);

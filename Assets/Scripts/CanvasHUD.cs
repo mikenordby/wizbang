@@ -60,6 +60,7 @@ public class CanvasHUD : MonoBehaviour
     
     private void Update()
     {
+        if (GamePhaseManager.CurrentPhase != GamePhase.Gameplay) return;
         if (player == null || GameState.IsPaused) return;
         
         gameTime += Time.deltaTime;

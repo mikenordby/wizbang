@@ -13,19 +13,35 @@ public class TreasureChest : MonoBehaviour
     {
         // Create sprite renderer
         spriteRenderer = gameObject.AddComponent<SpriteRenderer>();
-        spriteRenderer.sprite = CreateChestSprite();
+        spriteRenderer.sprite = LoadChestSprite();
         spriteRenderer.sortingOrder = 5; // Same as projectiles (above ground)
         
         // Create trigger collider for pickup
+        // Chest sprite is ~64px at 64 PPU = 1.0 world unit
+        // Use smaller radius for tighter hitbox that matches chest body
         chestCollider = gameObject.AddComponent<CircleCollider2D>();
-        chestCollider.radius = 0.6f; // ~40px at 64 PPU
+        chestCollider.radius = 0.45f; // Tighter fit to chest body (was 0.6f)
         chestCollider.isTrigger = true;
     }
     
     /// <summary>
-    /// Create a procedural treasure chest sprite
+    /// Load treasure chest sprite from Resources (PixelLab generated)
     /// </summary>
-    private Sprite CreateChestSprite()
+    private Sprite LoadChestSprite()
+    {
+        Sprite sprite = Resources.Load<Sprite>("Sprites/Objects/treasure_chest_closed");
+        if (sprite == null)
+        {
+            DebugLog.Error("[TreasureChest] Failed to load treasure_chest_closed sprite from Resources");
+            return CreateFallbackChestSprite();
+        }
+        return sprite;
+    }
+    
+    /// <summary>
+    /// Create a fallback procedural treasure chest sprite if loading fails
+    /// </summary>
+    private Sprite CreateFallbackChestSprite()
     {
         int resolution = 64;
         Texture2D texture = new Texture2D(resolution, resolution);

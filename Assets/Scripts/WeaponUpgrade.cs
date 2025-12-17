@@ -12,7 +12,8 @@ public class WeaponUpgrade
         ProjectileCount, // Add projectiles
         FireRate,        // Reduce cooldown (increase fire rate)
         Pierce,          // Projectiles pierce through enemies
-        Range            // Increase projectile lifetime/range
+        Range,           // Increase projectile lifetime/range
+        ProjectileSize   // Increase projectile/AoE size
     }
     
     public UpgradeType type;
@@ -42,6 +43,8 @@ public class WeaponUpgrade
                 return $"+{currentLevel} Pierce (Lv {currentLevel}/{maxLevel})";
             case UpgradeType.Range:
                 return $"+{GetRangeBonus():F0}% Range (Lv {currentLevel}/{maxLevel})";
+            case UpgradeType.ProjectileSize:
+                return $"+{GetSizeBonus():F0}% Size (Lv {currentLevel}/{maxLevel})";
             default:
                 return "Unknown Upgrade";
         }
@@ -63,6 +66,8 @@ public class WeaponUpgrade
                 return $"+1 Pierce";
             case UpgradeType.Range:
                 return $"+30% Range";
+            case UpgradeType.ProjectileSize:
+                return $"+20% Size";
             default:
                 return "Unknown";
         }
@@ -74,4 +79,5 @@ public class WeaponUpgrade
     public float GetFireRateBonus() => currentLevel * 20f; // 20% per level
     public int GetPierceBonus() => currentLevel;
     public float GetRangeBonus() => currentLevel * 30f; // 30% per level
+    public float GetSizeBonus() => currentLevel * 20f; // 20% per level
 }

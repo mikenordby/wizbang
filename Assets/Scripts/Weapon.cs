@@ -18,21 +18,11 @@ public abstract class Weapon : MonoBehaviour
     [SerializeField] protected float baseRange = 1f; // Multiplier for projectile lifetime
     
     [Header("Projectile Properties")]
-    [Tooltip("Base movement speed of projectiles")]
-    [SerializeField] protected float projectileSpeed = 8f;
-    
     [Tooltip("Visual and collision size multiplier (1.0 = normal)")]
     [SerializeField] protected float projectileSize = 1f;
     
     [Tooltip("Type of damage (affects future elemental interactions)")]
     [SerializeField] protected DamageType damageType = DamageType.Physical;
-    
-    [Header("Advanced Properties")]
-    [Tooltip("Spread angle in degrees for multiple projectiles (0 = parallel)")]
-    [SerializeField] protected float spreadAngle = 0f;
-    
-    [Tooltip("Enable homing behavior (targets nearest enemy)")]
-    [SerializeField] protected bool homing = false;
     
     // Individual upgrade tracking
     protected Dictionary<WeaponUpgrade.UpgradeType, WeaponUpgrade> upgrades = new Dictionary<WeaponUpgrade.UpgradeType, WeaponUpgrade>();
@@ -43,6 +33,7 @@ public abstract class Weapon : MonoBehaviour
     protected float currentFireRate;
     protected int currentPierce;
     protected float currentRange;
+    protected float currentProjectileSize;
     
     [Header("References")]
     [SerializeField] protected Transform playerTransform;
@@ -64,6 +55,7 @@ public abstract class Weapon : MonoBehaviour
         upgrades[WeaponUpgrade.UpgradeType.FireRate] = new WeaponUpgrade(WeaponUpgrade.UpgradeType.FireRate, 8);
         upgrades[WeaponUpgrade.UpgradeType.Pierce] = new WeaponUpgrade(WeaponUpgrade.UpgradeType.Pierce, 5);
         upgrades[WeaponUpgrade.UpgradeType.Range] = new WeaponUpgrade(WeaponUpgrade.UpgradeType.Range, 5);
+        upgrades[WeaponUpgrade.UpgradeType.ProjectileSize] = new WeaponUpgrade(WeaponUpgrade.UpgradeType.ProjectileSize, 5);
             
         RecalculateStats();
     }
@@ -85,6 +77,9 @@ public abstract class Weapon : MonoBehaviour
     
     protected virtual void Update()
     {
+        // ONLY fire weapons during gameplay phase
+        if (GamePhaseManager.CurrentPhase != GamePhase.Gameplay) return;
+        
         if (GameState.IsPaused) return;
         
         timeSinceLastFire += Time.deltaTime;
@@ -190,6 +185,10 @@ public abstract class Weapon : MonoBehaviour
         // Range: base + upgrade bonus
         float rangeUpgradeBonus = upgrades[WeaponUpgrade.UpgradeType.Range].GetRangeBonus();
         currentRange = baseRange * (1f + rangeUpgradeBonus / 100f);
+        
+        // Projectile Size: base + upgrade bonus
+        float sizeUpgradeBonus = upgrades[WeaponUpgrade.UpgradeType.ProjectileSize].GetSizeBonus();
+        currentProjectileSize = projectileSize * (1f + sizeUpgradeBonus / 100f);
     }
     
     // Public getters
@@ -202,5 +201,6 @@ public abstract class Weapon : MonoBehaviour
     public int ProjectileCount => currentProjectileCount;
     public int Pierce => currentPierce;
     public float Range => currentRange;
+    public float ProjectileSize => currentProjectileSize;
     public Dictionary<WeaponUpgrade.UpgradeType, WeaponUpgrade> Upgrades => upgrades;
 }

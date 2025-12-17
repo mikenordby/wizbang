@@ -7,7 +7,7 @@ using System.Collections.Generic;
 /// </summary>
 public abstract class BaseProjectile : MonoBehaviour, ICollidable
 {
-    [SerializeField] protected float collisionRadius = 0.15f;
+    [SerializeField] protected float baseCollisionRadius = 0.15f; // Base radius before size scaling
     
     protected bool isActive;
     protected SpriteRenderer spriteRenderer;
@@ -16,13 +16,15 @@ public abstract class BaseProjectile : MonoBehaviour, ICollidable
     protected int enemiesHit;
     protected HashSet<int> hitEnemyIDs = new HashSet<int>();
     protected DamageType damageType = DamageType.Physical;
+    protected float size = 1f; // Size multiplier for visual and hitbox
     
     public bool IsActive => isActive;
-    public virtual float CollisionRadius => collisionRadius;
+    public virtual float CollisionRadius => baseCollisionRadius * size; // Scale hitbox with size
     public float Damage => damage;
     public int Pierce => pierce;
     public int EnemiesHit => enemiesHit;
     public DamageType DamageType => damageType;
+    public float Size => size;
     
     // ICollidable implementation
     public Vector3 Position => transform.position;
@@ -36,16 +38,22 @@ public abstract class BaseProjectile : MonoBehaviour, ICollidable
     }
     
     /// <summary>
-    /// Set projectile stats (damage, pierce, and damage type)
+    /// Set projectile stats (damage, pierce, damage type, and size)
+    /// Size affects both visual scale and collision hitbox
     /// </summary>
-    public virtual void SetStats(float damageValue, int pierceValue, DamageType type = DamageType.Physical)
+    public virtual void SetStats(float damageValue, int pierceValue, DamageType type = DamageType.Physical, float sizeMultiplier = 1f)
     {
         damage = damageValue;
         pierce = pierceValue;
         damageType = type;
+        size = sizeMultiplier;
         enemiesHit = 0;
         hitEnemyIDs.Clear();
-        DebugLog.Verbose($"[BaseProjectile] SetStats: damage={damage:F1}, pierce={pierce}, type={damageType}, enemiesHit reset to 0, hitEnemyIDs cleared");
+        
+        // Apply visual scaling
+        transform.localScale = Vector3.one * size;
+        
+        DebugLog.Verbose($"[BaseProjectile] SetStats: damage={damage:F1}, pierce={pierce}, type={damageType}, size={size:F2}, collisionRadius={CollisionRadius:F3}");
     }
     
     /// <summary>
@@ -69,6 +77,16 @@ public abstract class BaseProjectile : MonoBehaviour, ICollidable
         bool shouldDeactivate = enemiesHit > pierce; // Deactivate if hit more enemies than pierce allows
         DebugLog.Verbose($"[BaseProjectile] RegisterHit: New enemy {enemyInstanceID}, enemiesHit={enemiesHit}, pierce={pierce}, shouldDeactivate={shouldDeactivate}");
         return shouldDeactivate;
+    }
+    
+    /// <summary>
+    /// Clear the hit enemy list - used by boomerangs to damage enemies again on return trip
+    /// </summary>
+    public void ClearHitList()
+    {
+        hitEnemyIDs.Clear();
+        enemiesHit = 0;
+        DebugLog.Verbose($"[BaseProjectile] ClearHitList: Reset hit tracking for new trajectory phase");
     }
     
     /// <summary>
@@ -109,6 +127,7 @@ public abstract class BaseProjectile : MonoBehaviour, ICollidable
     /// </summary>
     protected virtual void Update()
     {
+        if (GamePhaseManager.CurrentPhase != GamePhase.Gameplay) return;
         if (GameState.IsPaused) return;
         if (!isActive) return;
         

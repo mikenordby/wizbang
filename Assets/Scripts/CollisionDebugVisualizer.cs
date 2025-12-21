@@ -140,7 +140,7 @@ public class CollisionDebugVisualizer : MonoBehaviour
         // Log once every 5 seconds for debugging (reduced spam)
         if (Time.frameCount % 300 == 0 && circlesDrawn > 0)
         {
-            DebugLog.Info($"[CollisionDebug] Drawing {circlesDrawn} hitbox circles");
+            DebugLog.Verbose($"[CollisionDebug] Drawing {circlesDrawn} hitbox circles", "Collision");
         }
     }
     

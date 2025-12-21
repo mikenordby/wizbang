@@ -99,31 +99,81 @@ public class EnemyPool : ObjectPool<Enemy>
         
         // Build list of available enemy types based on game time
         List<EnemyStats> availableTypes = new List<EnemyStats>();
-        
+
         foreach (EnemyStats stats in enemyTypes)
         {
-            // Blob/Skeleton: Always available
+            // Enemy progression: Goblins (0-30s) → Skeletons (30-60s) → Dragons (60s+)
             // Ogre: DISABLED (sprites not available)
-            // Dragon: Available after 60 seconds
-            if (stats.enemyName == "Ogre")
-                continue; // Completely disabled - no sprites available
-            if (stats.enemyName == "Dragon" && gameTime < 60f)
-                continue;
+            // Use case-insensitive comparison for robustness
+            string enemyName = stats.enemyName?.Trim() ?? "";
 
+            // DIAGNOSTIC: Log each enemy check (first 300 frames only)
+            if (Time.frameCount < 300)
+            {
+                DebugLog.Info($"[EnemyPool] Checking enemy: '{enemyName}' at gameTime={gameTime:F2}s", "EnemyPool");
+            }
+
+            if (enemyName.Equals("Ogre", System.StringComparison.OrdinalIgnoreCase))
+            {
+                if (Time.frameCount < 300)
+                    DebugLog.Info($"[EnemyPool] → Skipping Ogre (disabled)", "EnemyPool");
+                continue; // Completely disabled - no sprites available
+            }
+            if (enemyName.Equals("Skeleton", System.StringComparison.OrdinalIgnoreCase) && gameTime < 30f)
+            {
+                if (Time.frameCount < 300)
+                    DebugLog.Info($"[EnemyPool] → Skipping Skeleton (locked until 30s, current={gameTime:F2}s)", "EnemyPool");
+                continue; // Unlock at 30 seconds
+            }
+            if (enemyName.Equals("Dragon", System.StringComparison.OrdinalIgnoreCase) && gameTime < 60f)
+            {
+                if (Time.frameCount < 300)
+                    DebugLog.Info($"[EnemyPool] → Skipping Dragon (locked until 60s, current={gameTime:F2}s)", "EnemyPool");
+                continue; // Unlock at 60 seconds
+            }
+
+            if (Time.frameCount < 300)
+                DebugLog.Info($"[EnemyPool] → ADDING '{enemyName}' to available list", "EnemyPool");
             availableTypes.Add(stats);
         }
-        
+
+        // Debug: Log what we're selecting (first few spawns only)
+        if (Time.frameCount < 300)
+        {
+            string availableNames = availableTypes.Count > 0
+                ? string.Join(", ", System.Linq.Enumerable.Select(availableTypes, e => e.enemyName))
+                : "NONE";
+            DebugLog.Info($"EnemyPool.GetRandomEnemyType: gameTime={gameTime:F1}s, available=[{availableNames}]", "EnemyPool");
+        }
+
         if (availableTypes.Count == 0)
         {
-            // Fallback: Return first non-disabled enemy (skip Ogre, respect time locks)
+            DebugLog.Warning($"[EnemyPool] availableTypes is EMPTY at gameTime={gameTime:F2}s! Using fallback...", "EnemyPool");
+            // Fallback: RESPECT time locks! Return only unlocked enemies
             foreach (EnemyStats stats in enemyTypes)
             {
-                if (stats.enemyName == "Ogre")
+                string enemyName = stats.enemyName?.Trim() ?? "";
+                DebugLog.Info($"[EnemyPool] Fallback checking: '{enemyName}'", "EnemyPool");
+
+                if (enemyName.Equals("Ogre", System.StringComparison.OrdinalIgnoreCase))
+                {
+                    DebugLog.Info($"[EnemyPool] Fallback: Skipping Ogre (disabled)", "EnemyPool");
                     continue; // Never use Ogre
-                // Ignore time locks in fallback - better to spawn early Dragon than crash
-                return stats;
+                }
+                if (enemyName.Equals("Skeleton", System.StringComparison.OrdinalIgnoreCase) && gameTime < 30f)
+                {
+                    DebugLog.Info($"[EnemyPool] Fallback: Skipping Skeleton (locked until 30s)", "EnemyPool");
+                    continue; // Locked until 30s
+                }
+                if (enemyName.Equals("Dragon", System.StringComparison.OrdinalIgnoreCase) && gameTime < 60f)
+                {
+                    DebugLog.Info($"[EnemyPool] Fallback: Skipping Dragon (locked until 60s)", "EnemyPool");
+                    continue; // Locked until 60s
+                }
+                DebugLog.Info($"[EnemyPool] Fallback: Returning '{enemyName}'", "EnemyPool");
+                return stats; // Return first unlocked enemy (should be Goblin)
             }
-            DebugLog.Error("EnemyPool.GetRandomEnemyType: No valid enemy types available!");
+            DebugLog.Error($"EnemyPool.GetRandomEnemyType: No valid enemy types available at gameTime={gameTime:F1}s! Check enemy configuration.", "EnemyPool");
             return null;
         }
         

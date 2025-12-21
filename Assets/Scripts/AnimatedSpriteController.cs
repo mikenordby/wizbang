@@ -119,8 +119,11 @@ public class AnimatedSpriteController : MonoBehaviour
                 DebugLog.Warning($"CACHED animations loaded but sprite NOT assigned for {cacheKey}", "AnimSprite");
             }
             return;
-        }        
-        animationCache.Clear();
+        }
+        // CRITICAL FIX: Create NEW dictionary instance instead of clearing
+        // Clearing would affect other enemies sharing the same dictionary reference from global cache!
+        // This fixes the bug where recycled enemies (skeleton->dragon) would corrupt other enemies' sprites
+        animationCache = new Dictionary<Direction8, Sprite[]>();
         
         Direction8[] directions = new Direction8[]
         {

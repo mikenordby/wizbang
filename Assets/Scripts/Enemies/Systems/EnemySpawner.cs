@@ -24,7 +24,7 @@ public class EnemySpawner : MonoBehaviour
     private float cleanupTimer;
     private float gameTime; // Track time for spawn rate scaling
     private float currentSpawnInterval;
-    private bool ogreUnlocked = false; // DISABLED - sprites not available
+    private bool skeletonUnlocked = false;
     private bool dragonUnlocked = false;
     
     private void Start()
@@ -59,17 +59,16 @@ public class EnemySpawner : MonoBehaviour
         // Track game time and scale spawn rate (doubles every minute)
         gameTime += Time.deltaTime;
         
-        // Check for enemy unlocks
-        // DISABLED: Ogre sprites not available
-        // if (!ogreUnlocked && gameTime >= 30f)
-        // {
-        //     ogreUnlocked = true;
-        //     DebugLog.Info("[EnemySpawner] Ogres are now spawning!");
-        // }
+        // Enemy unlock progression: Goblins (0-30s) → Skeletons (30-60s) → Dragons (60s+)
+        if (!skeletonUnlocked && gameTime >= 30f)
+        {
+            skeletonUnlocked = true;
+            DebugLog.Info("[EnemySpawner] Skeletons are now spawning!", "EnemySpawner");
+        }
         if (!dragonUnlocked && gameTime >= 60f)
         {
             dragonUnlocked = true;
-            DebugLog.Info("[EnemySpawner] Dragons are now spawning!");
+            DebugLog.Info("[EnemySpawner] Dragons are now spawning!", "EnemySpawner");
         }
         
         float minutesElapsed = gameTime / 60f;

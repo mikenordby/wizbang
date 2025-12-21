@@ -12,7 +12,7 @@ public class TreasureChestSpawner : MonoBehaviour
     [SerializeField] private Transform player;
     
     [Tooltip("Chance that a chunk will spawn a chest (0.0 to 1.0)")]
-    [SerializeField] private float chestSpawnChance = 0.05f; // 5% = ~1 per 20 chunks
+    [SerializeField] private float chestSpawnChance = 0.2f; // 20% = ~1 per 5 chunks
     
     [Tooltip("Size of each chunk in world units (should match RockSpawner)")]
     [SerializeField] private int chunkSize = 20;

@@ -54,8 +54,8 @@ public class Health : MonoBehaviour, IDamageable
         // Apply damage
         currentHealth -= damage;
         currentHealth = Mathf.Max(0f, currentHealth);
-        
-        DebugLog.Info($"[Health.TakeDamage] {gameObject.name} took {damage:F1} damage, HP: {currentHealth:F1}/{maxHealth:F1}");
+
+        DebugLog.Verbose($"[Health.TakeDamage] {gameObject.name} took {damage:F1} damage, HP: {currentHealth:F1}/{maxHealth:F1}");
         
         // Show red damage number for player
         if (gameObject.CompareTag("Player"))

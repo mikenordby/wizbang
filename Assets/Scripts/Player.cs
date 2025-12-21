@@ -184,10 +184,11 @@ public class Player : MonoBehaviour, ICollidable
         if (animController == null)
             animController = gameObject.AddComponent<AnimatedSpriteController>();
         
-        animController.SetEntityType(character.spriteType);
-        animController.SetAnimation("walking");
+        // Use "Playerwizard" to match Heroes/wizard path structure
+        animController.SetEntityType("Player" + character.spriteType);
+        animController.SetAnimation("walking-8-frames");
         animController.LoadAllAnimations();
-        DebugLog.Info($"[Player] AnimatedSpriteController configured for {character.spriteType}/walking");
+        DebugLog.Info($"[Player] AnimatedSpriteController configured for Heroes/{character.spriteType}/walking-8-frames");
         
         // Scale adjustment: PixelLab wizard is 96×96@PPU32 = 3 units, procedural is 128×128@PPU128 = 1 unit
         // To maintain similar visual size: scale by PPU ratio

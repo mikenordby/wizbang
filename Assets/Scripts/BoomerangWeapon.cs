@@ -28,6 +28,8 @@ public class BoomerangWeapon : Weapon, IWeaponCollisionHandler
         // Create boomerang pool
         CreateBoomerangPool();
         
+        RegisterWithCollisionManager();
+        
         DebugLog.Info("[BoomerangWeapon] Initialized with arc throw pattern");
     }
     

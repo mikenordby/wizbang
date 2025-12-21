@@ -78,12 +78,19 @@ public class CharacterSelectionUI : MonoBehaviour
     
     private void CreateEnhancedUI()
     {
+        Debug.LogError("[CharacterSelectionUI] CreateEnhancedUI started");
         // Create EventSystem if needed
         if (FindAnyObjectByType<UnityEngine.EventSystems.EventSystem>() == null)
         {
+            DebugLog.Verbose("[CharacterSelectionUI] Creating EventSystem");
             GameObject eventSystemObj = new GameObject("EventSystem");
             eventSystemObj.AddComponent<UnityEngine.EventSystems.EventSystem>();
             eventSystemObj.AddComponent<UnityEngine.InputSystem.UI.InputSystemUIInputModule>();
+            DebugLog.Verbose("[CharacterSelectionUI] EventSystem created successfully");
+        }
+        else
+        {
+            DebugLog.Verbose("[CharacterSelectionUI] EventSystem already exists");
         }
         
         // Create canvas
@@ -381,7 +388,11 @@ public class CharacterSelectionUI : MonoBehaviour
             cardButton.colors = colors;
             
             CharacterData capturedCharacter = character;
-            cardButton.onClick.AddListener(() => SelectCharacter(capturedCharacter));
+            DebugLog.Verbose($"[CharacterSelectionUI] Setting up button for {capturedCharacter.characterName}, interactable={cardButton.interactable}");
+            cardButton.onClick.AddListener(() => {
+                DebugLog.Verbose($"[CharacterSelectionUI] Button clicked for: {capturedCharacter?.characterName ?? "NULL"}");
+                SelectCharacter(capturedCharacter);
+            });
             
             // Hover events using EventTrigger
             EventTrigger trigger = cardObj.AddComponent<EventTrigger>();
@@ -518,6 +529,7 @@ public class CharacterSelectionUI : MonoBehaviour
     
     private void SelectCharacter(CharacterData character)
     {
+        DebugLog.Info($"[CharacterSelectionUI] SelectCharacter called for: {character?.characterName ?? "NULL"}");
         OnCharacterSelected(character);
     }
     
@@ -539,9 +551,11 @@ public class CharacterSelectionUI : MonoBehaviour
         
         // Initialize player with selected character
         InitializePlayerCharacter();
-        
+
         // CRITICAL: Transition to gameplay AFTER player initialization
+        DebugLog.Verbose($"[CharacterSelectionUI] About to call TransitionToGameplay, current phase: {GamePhaseManager.CurrentPhase}");
         GamePhaseManager.TransitionToGameplay();
+        DebugLog.Info($"[CharacterSelectionUI] After TransitionToGameplay, current phase: {GamePhaseManager.CurrentPhase}");
     }
     
     private void InitializePlayerCharacter()

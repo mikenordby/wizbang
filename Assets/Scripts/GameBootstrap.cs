@@ -16,41 +16,28 @@ public class GameBootstrap : MonoBehaviour
         if (enablePersistentLogging)
         {
             PersistentLogger.Initialize();
-            PersistentLogger.Separator("GAME BOOTSTRAP");
-            PersistentLogger.Info("GameBootstrap.Awake() called", "Bootstrap");
-            PersistentLogger.Info($"Scene: {UnityEngine.SceneManagement.SceneManager.GetActiveScene().name}", "Bootstrap");
+            string sceneName = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+            DebugLog.Info($"Game started: {sceneName} (Unity {Application.unityVersion}, {Application.platform})", "Bootstrap");
         }
-        
+
         // Initialize other core systems here
         InitializeGameEvents();
-        
-        PersistentLogger.Info("Bootstrap complete", "Bootstrap");
-        PersistentLogger.Separator();
     }
     
     private void InitializeGameEvents()
     {
-        // Test if GameEvents system is working
-        bool eventsWorking = true;
-        
+        // Test if GameEvents system is working (silent unless error)
         try
         {
             // Subscribe to a test event (use OnGamePaused which exists)
             System.Action<bool> testHandler = (paused) => { };
             GameEvents.OnGamePaused += testHandler;
             GameEvents.OnGamePaused -= testHandler;
-            
-            PersistentLogger.Info("GameEvents system verified - working correctly", "Bootstrap");
+            // Success - no logging needed
         }
         catch (System.Exception ex)
         {
-            eventsWorking = false;
-            PersistentLogger.Error($"GameEvents system FAILED: {ex.Message}", "Bootstrap");
-        }
-        
-        if (!eventsWorking)
-        {
-            Debug.LogError("[Bootstrap] GameEvents system is not working properly!");
+            DebugLog.Error($"GameEvents system initialization FAILED: {ex.Message}", "Bootstrap");
         }
     }
     
@@ -58,8 +45,7 @@ public class GameBootstrap : MonoBehaviour
     {
         if (enablePersistentLogging)
         {
-            PersistentLogger.Separator("APPLICATION QUIT");
-            PersistentLogger.Info("Application shutting down", "Bootstrap");
+            DebugLog.Info("Game stopped", "Bootstrap");
             PersistentLogger.Close();
         }
     }

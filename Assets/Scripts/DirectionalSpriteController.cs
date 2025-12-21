@@ -130,8 +130,6 @@ public class DirectionalSpriteController : MonoBehaviour
 
         Direction8 newDir = GetDirectionFromVector(movement);
         
-        DebugLog.Info($"[DirectionalSpriteController] UpdateDirection: movement={movement}, newDir={newDir}, currentDir={currentDirection}");
-        
         if (newDir != currentDirection)
         {
             currentDirection = newDir;
@@ -139,7 +137,6 @@ public class DirectionalSpriteController : MonoBehaviour
             if (spriteCache.ContainsKey(newDir) && spriteRenderer != null)
             {
                 spriteRenderer.sprite = spriteCache[newDir];
-                DebugLog.Info($"[DirectionalSpriteController] ✓ Changed sprite to {newDir}: {spriteRenderer.sprite.name}");
             }
             else
             {

@@ -33,6 +33,8 @@ public class FireRingWeapon : Weapon, IWeaponCollisionHandler
         
         collisionManager = GameServices.CollisionManager;
         
+        RegisterWithCollisionManager();
+        
         CreateRingVisual();
         
         DebugLog.Info("[FireRingWeapon] Initialized - Circle of Fire!");

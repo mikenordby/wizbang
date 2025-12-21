@@ -75,10 +75,45 @@ public abstract class Weapon : MonoBehaviour
         RecalculateStats();
     }
     
+    /// <summary>
+    /// Auto-registers this weapon with CollisionManager if it implements IWeaponCollisionHandler.
+    /// Call this from derived weapon's Awake() after base.Awake().
+    /// </summary>
+    protected void RegisterWithCollisionManager()
+    {
+        // Only register if weapon implements the collision interface
+        if (this is IWeaponCollisionHandler handler)
+        {
+            CollisionManager collisionMgr = FindAnyObjectByType<CollisionManager>();
+            if (collisionMgr != null)
+            {
+                collisionMgr.RegisterWeapon(handler);
+                DebugLog.Info($"[{weaponName}] Auto-registered with CollisionManager");
+            }
+            else
+            {
+                DebugLog.Error($"[{weaponName}] CollisionManager not found - collisions will NOT work!");
+            }
+        }
+    }
+    
     protected virtual void Update()
     {
+        // Debug logging - only log occasionally
+        if (Time.frameCount % 120 == 0) // Every 2 seconds
+        {
+            DebugLog.Verbose($"[Weapon.Update] Called on {GetType().Name}, phase={GamePhaseManager.CurrentPhase}, paused={GameState.IsPaused}, timeSinceLastFire={timeSinceLastFire:F2}");
+        }
+        
         // ONLY fire weapons during gameplay phase
-        if (GamePhaseManager.CurrentPhase != GamePhase.Gameplay) return;
+        if (GamePhaseManager.CurrentPhase != GamePhase.Gameplay)
+        {
+            if (Time.frameCount % 60 == 0) // Log once per second
+            {
+                DebugLog.Warning($"[Weapon] Cannot fire - current phase is {GamePhaseManager.CurrentPhase}, need Gameplay");
+            }
+            return;
+        }
         
         if (GameState.IsPaused) return;
         
@@ -86,6 +121,7 @@ public abstract class Weapon : MonoBehaviour
         
         if (timeSinceLastFire >= 1f / currentFireRate)
         {
+            DebugLog.Verbose($"[Weapon] Firing {GetType().Name}, timeSinceLastFire={timeSinceLastFire:F2}, fireRate={currentFireRate:F2}");
             Fire();
             timeSinceLastFire = 0f;
         }
@@ -166,7 +202,7 @@ public abstract class Weapon : MonoBehaviour
         if (player != null)
             currentDamage *= player.DamageMultiplier;
         
-        DebugLog.Info($"[Weapon.RecalculateStats] {weaponName}: baseDamage={baseDamage:F1}, upgradeBonus={damageUpgradeBonus:F1}%, playerMult={player?.DamageMultiplier:F2} → currentDamage={currentDamage:F1}");
+        DebugLog.Info($"[Weapon.RecalculateStats] {weaponName}: baseDamage={baseDamage:F1}, upgradeBonus={damageUpgradeBonus:F1}%, playerMult={player?.DamageMultiplier:F2} → currentDamage={currentDamage:F1}", "Weapon");
         
         // Fire rate: base + upgrade bonus + player attack speed
         float fireRateUpgradeBonus = upgrades[WeaponUpgrade.UpgradeType.FireRate].GetFireRateBonus();

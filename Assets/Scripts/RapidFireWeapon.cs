@@ -28,6 +28,8 @@ public class RapidFireWeapon : Weapon, IWeaponCollisionHandler
         
         projectilePool = GameServices.ProjectilePool;
         
+        RegisterWithCollisionManager();
+        
         DebugLog.Info("[RapidFireWeapon] Initialized - spray and pray!");
     }
     

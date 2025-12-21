@@ -21,32 +21,23 @@ public class BackgroundManager : MonoBehaviour
     
     private void Start()
     {
-        PersistentLogger.Separator("BACKGROUND MANAGER START");
-        PersistentLogger.Info("Start() called", "BackgroundManager");
-        Debug.Log("[BackgroundManager] Start() called");
-        DebugLog.Info("[BackgroundManager] Start() called");
+        DebugLog.Info("[BackgroundManager] Start() called", "Background");
         
         if (mainCamera == null)
         {
             mainCamera = Camera.main;
             if (mainCamera != null)
             {
-                PersistentLogger.Info($"Found Camera.main: {mainCamera.name}", "BackgroundManager");
-                Debug.Log($"[BackgroundManager] Found Camera.main: {mainCamera.name}");
-                DebugLog.Info($"[BackgroundManager] Found Camera.main: {mainCamera.name}");
+                DebugLog.Info($"[BackgroundManager] Found Camera.main: {mainCamera.name}", "Background");
             }
             else
             {
-                PersistentLogger.Error("Camera.main is NULL!", "BackgroundManager");
-                Debug.LogError("[BackgroundManager] Camera.main is NULL!");
-                DebugLog.Error("[BackgroundManager] Camera.main is NULL!");
+                DebugLog.Error("[BackgroundManager] Camera.main is NULL!", "Background");
             }
         }
         else
         {
-            PersistentLogger.Info($"Using assigned camera: {mainCamera.name}", "BackgroundManager");
-            Debug.Log($"[BackgroundManager] Using assigned camera: {mainCamera.name}");
-            DebugLog.Info($"[BackgroundManager] Using assigned camera: {mainCamera.name}");
+            DebugLog.Info($"[BackgroundManager] Using assigned camera: {mainCamera.name}", "Background");
         }
         
         InitializeBackground();
@@ -57,9 +48,7 @@ public class BackgroundManager : MonoBehaviour
     /// </summary>
     private void InitializeBackground()
     {
-        PersistentLogger.Info("InitializeBackground() called", "BackgroundManager");
-        Debug.Log("[BackgroundManager] InitializeBackground() called");
-        DebugLog.Info("[BackgroundManager] InitializeBackground() called");
+        DebugLog.Info("[BackgroundManager] InitializeBackground() called", "Background");
         
         if (isInitialized)
         {
@@ -77,16 +66,13 @@ public class BackgroundManager : MonoBehaviour
             return;
         }
         
-        PersistentLogger.Info("No tilemap found, creating sprite-based background", "BackgroundManager");
-        Debug.Log("[BackgroundManager] No tilemap found, creating sprite-based background");
-        DebugLog.Info("[BackgroundManager] No tilemap found, creating sprite-based background");
-        
+        DebugLog.Info("[BackgroundManager] No tilemap found, creating sprite-based background", "Background");
+
         // Fall back to sprite-based background
         CreateSpriteBackground();
         isInitialized = true;
-        
-        Debug.Log("[BackgroundManager] Background initialization complete");
-        DebugLog.Info("[BackgroundManager] Background initialization complete");
+
+        DebugLog.Info("[BackgroundManager] Background initialization complete", "Background");
     }
     
     /// <summary>
@@ -94,9 +80,7 @@ public class BackgroundManager : MonoBehaviour
     /// </summary>
     private void CreateSpriteBackground()
     {
-        PersistentLogger.Info("CreateSpriteBackground() starting...", "BackgroundManager");
-        Debug.Log("[BackgroundManager] CreateSpriteBackground() starting...");
-        DebugLog.Info("[BackgroundManager] CreateSpriteBackground() starting...");
+        DebugLog.Info("[BackgroundManager] CreateSpriteBackground() starting...", "Background");
         
         // Create background GameObject
         GameObject bgObj = new GameObject("Background");
@@ -131,9 +115,7 @@ public class BackgroundManager : MonoBehaviour
                 
                 if (grassTile == null)
                 {
-                    PersistentLogger.Error($"BackgroundLoader.CreateGrassTile returned NULL at tile ({tileX}, {tileY})!", "BackgroundManager");
-                    Debug.LogError($"[BackgroundManager] BackgroundLoader.CreateGrassTile returned NULL at tile ({tileX}, {tileY})!");
-                    DebugLog.Error($"[BackgroundManager] BackgroundLoader.CreateGrassTile returned NULL at tile ({tileX}, {tileY})!");
+                    DebugLog.Error($"[BackgroundManager] BackgroundLoader.CreateGrassTile returned NULL at tile ({tileX}, {tileY})!", "Background");
                     continue;
                 }
                 
@@ -171,15 +153,11 @@ public class BackgroundManager : MonoBehaviour
         
         if (bgSprite == null)
         {
-            PersistentLogger.Error("Sprite.Create returned NULL!", "BackgroundManager");
-            Debug.LogError("[BackgroundManager] Sprite.Create returned NULL!");
-            DebugLog.Error("[BackgroundManager] Sprite.Create returned NULL!");
+            DebugLog.Error("[BackgroundManager] Sprite.Create returned NULL!", "Background");
             return;
         }
-        
-        PersistentLogger.Info($"Created sprite: {bgSprite.texture.width}x{bgSprite.texture.height}, PPU={bgSprite.pixelsPerUnit}", "BackgroundManager");
-        Debug.Log($"[BackgroundManager] Created sprite: {bgSprite.texture.width}x{bgSprite.texture.height}, PPU={bgSprite.pixelsPerUnit}");
-        DebugLog.Info($"[BackgroundManager] Created sprite: {bgSprite.texture.width}x{bgSprite.texture.height}, PPU={bgSprite.pixelsPerUnit}");
+
+        DebugLog.Info($"[BackgroundManager] Created sprite: {bgSprite.texture.width}x{bgSprite.texture.height}, PPU={bgSprite.pixelsPerUnit}", "Background");
         
         backgroundRenderer.sprite = bgSprite;
         DebugLog.Info("[BackgroundManager] Assigned sprite to SpriteRenderer");
@@ -205,15 +183,10 @@ public class BackgroundManager : MonoBehaviour
         }
         
         // Verify renderer is enabled and visible
-        Debug.Log($"[BackgroundManager] SpriteRenderer enabled: {backgroundRenderer.enabled}, sprite: {backgroundRenderer.sprite != null}");
-        Debug.Log($"[BackgroundManager] GameObject active: {bgObj.activeSelf}, layer: {bgObj.layer}");
-        DebugLog.Info($"[BackgroundManager] SpriteRenderer enabled: {backgroundRenderer.enabled}, sprite: {backgroundRenderer.sprite != null}");
-        DebugLog.Info($"[BackgroundManager] GameObject active: {bgObj.activeSelf}, layer: {bgObj.layer}");
-        
-        PersistentLogger.Info($"Created procedural grass background ({textureSize}x{textureSize}, {tilesPerSide}x{tilesPerSide} tiles)", "BackgroundManager");
-        PersistentLogger.Separator();
-        Debug.Log($"[BackgroundManager] Created procedural grass background ({textureSize}x{textureSize}, {tilesPerSide}x{tilesPerSide} tiles)");
-        DebugLog.Info($"[BackgroundManager] Created procedural grass background ({textureSize}x{textureSize}, {tilesPerSide}x{tilesPerSide} tiles)");
+        DebugLog.Info($"[BackgroundManager] SpriteRenderer enabled: {backgroundRenderer.enabled}, sprite: {backgroundRenderer.sprite != null}", "Background");
+        DebugLog.Info($"[BackgroundManager] GameObject active: {bgObj.activeSelf}, layer: {bgObj.layer}", "Background");
+
+        DebugLog.Info($"[BackgroundManager] Created procedural grass background ({textureSize}x{textureSize}, {tilesPerSide}x{tilesPerSide} tiles)", "Background");
     }
     
     /// <summary>

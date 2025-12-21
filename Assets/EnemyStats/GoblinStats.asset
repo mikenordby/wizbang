@@ -12,10 +12,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: de01032e123c8f5439c6fd2a4622cd0a, type: 3}
   m_Name: GoblinStats
   m_EditorClassIdentifier: Assembly-CSharp::EnemyStats
-  enemyName: Goblin
-  maxHealth: 10
-  contactDamage: 10
-  moveSpeed: 2
-  xpDrop: 1
-  color: {r: 0.4, g: 0.8, b: 0.3, a: 1}
+  enemyName: goblin
+  maxHealth: 15
+  contactDamage: 8
+  moveSpeed: 3
+  xpDrop: 3
+  color: {r: 0.2, g: 0.8, b: 0.2, a: 1}
   scale: 0.8

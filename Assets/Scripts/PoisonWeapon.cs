@@ -240,7 +240,7 @@ public class PoisonCloud : MonoBehaviour
     
     private void DamageEnemiesInRadius()
     {
-        if (enemyPool == null) return;
+        if (enemyPool == null || player == null) return;
         
         // Create snapshot to avoid collection modification during iteration
         var enemies = new System.Collections.Generic.List<Enemy>(enemyPool.GetActiveEnemies());
@@ -260,7 +260,7 @@ public class PoisonCloud : MonoBehaviour
                 var context = new DamageContext
                 {
                     baseDamage = damagePerTick,
-                    player = player,
+                    player = player, // May be null - DamageCalculator handles this gracefully
                     enemy = enemy,
                     damageType = DamageType.Poison
                 };

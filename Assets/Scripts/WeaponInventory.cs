@@ -31,6 +31,7 @@ public class WeaponInventory : MonoBehaviour
     /// </summary>
     public bool AddWeapon(string weaponType)
     {
+        DebugLog.Verbose($"[WeaponInventory] AddWeapon called with type: {weaponType}");
         if (activeWeapons.Count >= maxWeaponSlots)
         {
             DebugLog.Warning($"[WeaponInventory] Cannot add weapon - inventory full ({maxWeaponSlots} slots)");
@@ -126,6 +127,7 @@ public class WeaponInventory : MonoBehaviour
     /// </summary>
     private Weapon CreateWeapon(string weaponType)
     {
+        DebugLog.Verbose($"[WeaponInventory] CreateWeapon called with type: {weaponType}");
         GameObject weaponObj = new GameObject(weaponType);
         weaponObj.transform.SetParent(transform);
         
@@ -144,11 +146,14 @@ public class WeaponInventory : MonoBehaviour
         
         if (weapon == null)
         {
+            DebugLog.Error($"[WeaponInventory] Failed to create weapon type: {weaponType}");
             Destroy(weaponObj);
         }
         else
         {
+            DebugLog.Info($"[WeaponInventory] Weapon component created successfully: {weapon.GetType().Name}");
             weapon.Initialize(transform, player);
+            DebugLog.Verbose($"[WeaponInventory] Weapon initialized, enabled={weapon.enabled}, gameObject.active={weapon.gameObject.activeSelf}");
         }
         
         return weapon;

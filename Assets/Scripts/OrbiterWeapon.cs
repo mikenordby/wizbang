@@ -31,6 +31,8 @@ public class OrbiterWeapon : Weapon, IWeaponCollisionHandler
             DebugLog.Info("[OrbiterWeapon] Created OrbiterManager");
         }
         
+        RegisterWithCollisionManager();
+        
         // Initialize orbiters
         orbiterManager.SetOrbiterCount(projectileCount);
     }

@@ -59,7 +59,7 @@ public class CollisionManager : MonoBehaviour
         if (weapon != null && !registeredWeapons.Contains(weapon))
         {
             registeredWeapons.Add(weapon);
-            DebugLog.Info($"[CollisionManager] Registered weapon: {weapon.GetType().Name}");
+            DebugLog.Info($"[CollisionManager] Registered weapon: {weapon.GetType().Name}", "Collision");
         }
     }
     
@@ -71,7 +71,7 @@ public class CollisionManager : MonoBehaviour
         if (weapon != null && registeredWeapons.Contains(weapon))
         {
             registeredWeapons.Remove(weapon);
-            DebugLog.Info($"[CollisionManager] Unregistered weapon: {weapon.GetType().Name}");
+            DebugLog.Info($"[CollisionManager] Unregistered weapon: {weapon.GetType().Name}", "Collision");
         }
     }
     
@@ -79,7 +79,7 @@ public class CollisionManager : MonoBehaviour
     {
         // Initialize spatial hash grid
         spatialGrid = new SpatialHashGrid(gridCellSize);
-        DebugLog.Info($"[CollisionManager] Initialized spatial hash grid with cell size {gridCellSize}");
+        DebugLog.Info($"[CollisionManager] Initialized spatial hash grid with cell size {gridCellSize}", "Collision");
         
         // Auto-find OrbiterManager if not assigned
         if (orbiterManager == null)
@@ -87,7 +87,7 @@ public class CollisionManager : MonoBehaviour
             orbiterManager = GetComponent<OrbiterManager>();
             if (orbiterManager != null)
             {
-                DebugLog.Info("[CollisionManager] Auto-found OrbiterManager on same GameObject");
+                DebugLog.Info("[CollisionManager] Auto-found OrbiterManager on same GameObject", "Collision");
             }
         }
         
@@ -122,10 +122,10 @@ public class CollisionManager : MonoBehaviour
                 RegisterWeapon(rapidFireWeapon);
             }
             
-            DebugLog.Info($"[CollisionManager] Registered {registeredWeapons.Count} weapons for collision detection");
+            DebugLog.Info($"[CollisionManager] Registered {registeredWeapons.Count} weapons for collision detection", "Collision");
         }
         
-        DebugLog.Info($"[CollisionManager] Starting - orbiterManager={orbiterManager != null}, enemyPool={enemyPool != null}, projectilePool={projectilePool != null}");
+        DebugLog.Verbose($"[CollisionManager] Starting - orbiterManager={orbiterManager != null}, enemyPool={enemyPool != null}, projectilePool={projectilePool != null}");
         
         if (playerTransform != null)
         {
@@ -165,10 +165,31 @@ public class CollisionManager : MonoBehaviour
         
         if (gameOver || GameState.IsPaused) return;
         
+        // Log collision manager is running
+        if (Time.frameCount % 120 == 0)
+        {
+            DebugLog.Verbose($"[CollisionManager.Update] Running, registeredWeapons={registeredWeapons.Count}");
+        }
+        
         // Safety check - spatial grid must be initialized
         if (spatialGrid == null)
         {
             spatialGrid = new SpatialHashGrid(gridCellSize);
+        }
+        
+        // Dynamic weapon registration (catches weapons added after Start)
+        if (playerTransform != null && registeredWeapons.Count == 0)
+        {
+            ProjectileWeapon projectileWeapon = playerTransform.GetComponent<ProjectileWeapon>();
+            if (projectileWeapon != null)
+            {
+                RegisterWeapon(projectileWeapon);
+                DebugLog.Info("[CollisionManager] Late-registered ProjectileWeapon in Update", "Collision");
+            }
+            else
+            {
+                DebugLog.Warning("[CollisionManager] No ProjectileWeapon found on player!");
+            }
         }
         
         // Populate spatial hash grid with all entities
@@ -176,6 +197,10 @@ public class CollisionManager : MonoBehaviour
         
         // Perform collision checks using grid
         // Check collisions for all registered weapons (new pattern - replaces old hard-coded methods)
+        if (Time.frameCount % 120 == 0 && registeredWeapons.Count > 0)
+        {
+            DebugLog.Verbose($"[CollisionManager] About to CheckRegisteredWeaponCollisions, count={registeredWeapons.Count}");
+        }
         CheckRegisteredWeaponCollisions();
         
         // Player collision still handled by CollisionManager (not weapon-specific)
@@ -214,6 +239,16 @@ public class CollisionManager : MonoBehaviour
     /// </summary>
     private void CheckRegisteredWeaponCollisions()
     {
+        if (registeredWeapons.Count == 0)
+        {
+            // Only warn once per second to avoid spam
+            if (Time.frameCount % 60 == 0)
+            {
+                DebugLog.Warning("[CollisionManager] No weapons registered for collision detection!");
+            }
+            return;
+        }
+        
         foreach (var weapon in registeredWeapons)
         {
             if (weapon != null && weapon.IsActive)
@@ -258,9 +293,9 @@ public class CollisionManager : MonoBehaviour
                         float damage = enemy.ContactDamage;
                         bool playerDied = playerHealth.TakeDamage(damage);
                         lastPlayerDamageTime = Time.time;
-                        
-                        DebugLog.Info($"Player hit by {enemy.name}! Took {damage} damage, HP: {playerHealth.CurrentHealth}/{playerHealth.MaxHealth}");
-                        
+
+                        DebugLog.Verbose($"Player hit by {enemy.name}! Took {damage} damage, HP: {playerHealth.CurrentHealth}/{playerHealth.MaxHealth}", "Collision");
+
                         // Show red damage number above player
                         DamageNumberPool damagePool = GameServices.DamageNumberPool;
                         if (damagePool != null)
@@ -273,12 +308,12 @@ public class CollisionManager : MonoBehaviour
                         if (enemyHealth != null)
                         {
                             enemyHealth.TakeDamage(999999f); // Instant kill
-                            DebugLog.Info($"Enemy {enemy.name} killed after hitting player (suicide attack)");
+                            DebugLog.Verbose($"Enemy {enemy.name} killed after hitting player (suicide attack)", "Collision");
                         }
                         
                         if (playerDied)
                         {
-                            DebugLog.Info("Player DIED!");
+                            DebugLog.Info("Player DIED!", "Player");
                             gameOver = true;
                             Time.timeScale = 0f;
                             return;

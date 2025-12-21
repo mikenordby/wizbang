@@ -41,15 +41,7 @@ public class CollisionDebugVisualizer : MonoBehaviour
         
         // ENABLE HITBOXES AUTOMATICALLY ON START
         showCollisionRadii = true;
-        DebugLog.Info("========================================");
-        DebugLog.Info("[CollisionDebug] ✓ HITBOX VISUALIZATION ENABLED");
-        DebugLog.Info($"[CollisionDebug] ✓ Attached to: {gameObject.name}");
-        DebugLog.Info($"[CollisionDebug] ✓ Camera.main exists: {Camera.main != null}");
-        DebugLog.Info($"[CollisionDebug] ✓ Line material created: {lineMaterial != null}");
-        DebugLog.Info($"[CollisionDebug] ✓ Shader found: {lineMaterial?.shader != null}");
-        DebugLog.Info("[CollisionDebug] Press 0 (zero) to toggle collision visualization");
-        DebugLog.Info("[CollisionDebug] Pools will be initialized lazily when needed");
-        DebugLog.Info("========================================");
+        DebugLog.Verbose("[CollisionDebug] Hitbox visualization enabled (press 0 to toggle)");
     }
     
     private void Update()

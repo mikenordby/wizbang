@@ -29,6 +29,18 @@ public class ProjectileWeapon : Weapon, IWeaponCollisionHandler
             DebugLog.Warning("[ProjectileWeapon] ProjectilePool not found");
         if (enemyPool == null)
             DebugLog.Warning("[ProjectileWeapon] EnemyPool not found");
+        
+        // Auto-register with CollisionManager
+        CollisionManager collisionMgr = FindAnyObjectByType<CollisionManager>();
+        if (collisionMgr != null)
+        {
+            collisionMgr.RegisterWeapon(this);
+            DebugLog.Info($"[ProjectileWeapon] Auto-registered with CollisionManager");
+        }
+        else
+        {
+            DebugLog.Error("[ProjectileWeapon] CollisionManager not found - collisions will NOT work!");
+        }
     }
     
     protected override void Fire()
@@ -64,7 +76,7 @@ public class ProjectileWeapon : Weapon, IWeaponCollisionHandler
             if (projectile != null)
             {
                 float finalSize = currentProjectileSize * (player != null ? player.ProjectileSizeMultiplier : 1f);
-                DebugLog.Info($"[ProjectileWeapon.Fire] Setting projectile stats: damage={currentDamage:F1} pierce={currentPierce} size={finalSize:F2}");
+                DebugLog.Info($"[ProjectileWeapon.Fire] Setting projectile stats: damage={currentDamage:F1} pierce={currentPierce} size={finalSize:F2}", "Weapon");
                 projectile.SetStats(currentDamage, currentPierce, DamageType.Physical, finalSize);
                 projectile.ActivateStraight(playerTransform.position, direction);
             }
@@ -107,14 +119,32 @@ public class ProjectileWeapon : Weapon, IWeaponCollisionHandler
     /// </summary>
     public void CheckCollisions(SpatialHashGrid grid, EnemyPool enemyPool)
     {
-        if (grid == null || enemyPool == null || projectilePool == null) return;
+        if (grid == null || enemyPool == null)
+        {
+            DebugLog.Warning("[ProjectileWeapon] CheckCollisions called with null grid or enemyPool");
+            return;
+        }
+        if (projectilePool == null)
+        {
+            DebugLog.Warning("[ProjectileWeapon] CheckCollisions: projectilePool is null");
+            return;
+        }
         
         // Get all active projectiles (shared pool)
         List<Projectile> activeProjectiles = new List<Projectile>(projectilePool.GetActiveProjectiles());
         
+        if (Time.frameCount % 120 == 0)
+        {
+            DebugLog.Verbose($"[ProjectileWeapon.CheckCollisions] Active projectiles: {activeProjectiles.Count}");
+        }
+        
+        int projectilesChecked = 0;
+        int totalNearbyEnemies = 0;
+        int totalHits = 0;
+        
         foreach (var projectile in activeProjectiles)
         {
-            if (!projectile.IsActive) continue;
+            projectilesChecked++;
             
             // Query spatial grid for nearby enemies
             var nearbyEntities = grid.Query(
@@ -122,6 +152,8 @@ public class ProjectileWeapon : Weapon, IWeaponCollisionHandler
                 projectile.CollisionRadius,
                 CollisionLayer.Enemy
             );
+            
+            totalNearbyEnemies += nearbyEntities.Count;
             
             foreach (var entity in nearbyEntities)
             {
@@ -135,6 +167,7 @@ public class ProjectileWeapon : Weapon, IWeaponCollisionHandler
                         int enemyID = enemy.gameObject.GetInstanceID();
                         if (projectile.RegisterHit(enemyID))
                         {
+                            totalHits++;
                             Health enemyHealth = enemy.GetComponent<Health>();
                             if (enemyHealth != null)
                             {
@@ -147,7 +180,9 @@ public class ProjectileWeapon : Weapon, IWeaponCollisionHandler
                                 };
                                 
                                 DamageResult result = DamageCalculator.Instance.CalculateDamage(context);
-                                enemyHealth.TakeDamage(result.finalDamage);
+                                bool died = enemyHealth.TakeDamage(result.finalDamage);
+
+                                DebugLog.Verbose($"[ProjectileWeapon] HIT! {enemy.name}: {result.finalDamage} damage, died={died}, pierce={projectile.EnemiesHit}/{projectile.Pierce}");
                                 
                                 DamageNumberPool damagePool = GameServices.DamageNumberPool;
                                 if (damagePool != null)
@@ -159,7 +194,8 @@ public class ProjectileWeapon : Weapon, IWeaponCollisionHandler
                                 }
                             }
                             
-                            if (projectile.EnemiesHit > projectile.Pierce)
+                            // Deactivate if exceeded pierce limit
+                            if (projectile.EnemiesHit >= projectile.Pierce)
                             {
                                 projectile.Deactivate();
                                 break;
@@ -168,6 +204,14 @@ public class ProjectileWeapon : Weapon, IWeaponCollisionHandler
                     }
                 }
             }
+        }        
+        if (Time.frameCount % 120 == 0)
+        {
+            DebugLog.Verbose($"[ProjectileWeapon.CheckCollisions] Summary: checked={projectilesChecked}, nearbyEnemies={totalNearbyEnemies}, hits={totalHits}");
+        }        
+        if (Time.frameCount % 120 == 0)
+        {
+            DebugLog.Verbose($"[ProjectileWeapon.CheckCollisions] Summary: checked={projectilesChecked}, nearbyEnemies={totalNearbyEnemies}, hits={totalHits}");
         }
     }
     

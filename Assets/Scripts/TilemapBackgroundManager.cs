@@ -18,8 +18,8 @@ public class TilemapBackgroundManager : MonoBehaviour
     private TileBase pureDesertTile;
     
     [Header("Generation Settings")]
-    [SerializeField] private int worldWidth = 100;
-    [SerializeField] private int worldHeight = 100;
+    [SerializeField] private int worldWidth = 300;
+    [SerializeField] private int worldHeight = 300;
     
     private Camera mainCamera;
     private Dictionary<Vector3Int, TileBase> generatedTiles = new Dictionary<Vector3Int, TileBase>();

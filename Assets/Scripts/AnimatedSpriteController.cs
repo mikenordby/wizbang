@@ -22,9 +22,14 @@ public class AnimatedSpriteController : MonoBehaviour
     private int currentFrame = 0;
     private float frameTimer = 0f;
     
-    // Cached animation data
+    // Cached animation data (per-instance)
     private Dictionary<Direction8, Sprite[]> animationCache = new Dictionary<Direction8, Sprite[]>();
     private bool isInitialized = false;
+    
+    // Static cache shared across all instances to avoid reloading same animations
+    // Key: "{category}/{entityType}/{animationName}" (e.g., "Heroes/wizard/walking-8-frames")
+    private static Dictionary<string, Dictionary<Direction8, Sprite[]>> globalAnimationCache 
+        = new Dictionary<string, Dictionary<Direction8, Sprite[]>>();
     
     void Awake()
     {
@@ -32,6 +37,20 @@ public class AnimatedSpriteController : MonoBehaviour
         {
             spriteRenderer = GetComponent<SpriteRenderer>();
         }
+
+        // Log if spriteRenderer is still null after Awake (diagnostic)
+        if (spriteRenderer == null)
+        {
+            DebugLog.Warning($"AnimatedSpriteController.Awake() on {gameObject.name}: SpriteRenderer is NULL after GetComponent()", "AnimSprite");
+        }
+    }
+
+    /// <summary>
+    /// Explicitly set the SpriteRenderer (useful when component is added dynamically)
+    /// </summary>
+    public void SetSpriteRenderer(SpriteRenderer renderer)
+    {
+        spriteRenderer = renderer;
     }
     
     void Start()
@@ -80,8 +99,27 @@ public class AnimatedSpriteController : MonoBehaviour
         {
             DebugLog.Warning($"[AnimatedSpriteController] EntityType not set, cannot load animations");
             return;
-        }
+        }        
+        // Check global cache first to avoid reloading
+        string category = entityType.StartsWith("Player", System.StringComparison.OrdinalIgnoreCase) ? "Heroes" : "Enemies";
+        string entityTypeLower = entityType.Replace("Player", "").ToLower();
+        string cacheKey = $"{category}/{entityTypeLower}/{animationName}";
         
+        if (globalAnimationCache.TryGetValue(cacheKey, out var cachedAnimations))
+        {
+            // Reuse cached animations (huge performance boost for spawning many enemies)
+            animationCache = cachedAnimations;
+            isInitialized = true;
+            currentFrame = 0;
+            UpdateSprite();
+            DebugLog.Verbose($"[AnimatedSpriteController] Loaded {cachedAnimations.Count} cached directions for {cacheKey}");
+            // Silent cache usage - only log if sprite assignment fails
+            if (spriteRenderer == null || spriteRenderer.sprite == null)
+            {
+                DebugLog.Warning($"CACHED animations loaded but sprite NOT assigned for {cacheKey}", "AnimSprite");
+            }
+            return;
+        }        
         animationCache.Clear();
         
         Direction8[] directions = new Direction8[]
@@ -104,7 +142,7 @@ public class AnimatedSpriteController : MonoBehaviour
             {
                 animationCache[dir] = frames;
                 loadedDirections++;
-                DebugLog.Info($"[AnimatedSpriteController] Loaded {frames.Length} frames for {entityType}/{animationName}/{GetDirectionName(dir)}");
+                DebugLog.Verbose($"[AnimatedSpriteController] Loaded {frames.Length} frames for {entityType}/{animationName}/{GetDirectionName(dir)}", "AnimSprite");
             }
         }
         
@@ -113,28 +151,46 @@ public class AnimatedSpriteController : MonoBehaviour
             isInitialized = true;
             currentFrame = 0;
             UpdateSprite();
-            DebugLog.Info($"[AnimatedSpriteController] Successfully loaded {loadedDirections}/8 directions for {entityType}/{animationName}");
+
+            // Cache loaded animations globally for reuse (reuse variables from above)
+            globalAnimationCache[cacheKey] = animationCache;
+
+            DebugLog.Info($"[AnimatedSpriteController] Successfully loaded {loadedDirections}/8 directions for {entityType}/{animationName}", "AnimSprite");
+            // Only log if something went wrong
+            if (loadedDirections < 8)
+            {
+                DebugLog.Warning($"Loaded ONLY {loadedDirections}/8 directions for {entityType}/{animationName}", "AnimSprite");
+            }
+            if (spriteRenderer == null || spriteRenderer.sprite == null)
+            {
+                PersistentLogger.Error($"Animations loaded but sprite NOT assigned for {entityType}/{animationName}", "AnimSprite", captureScreenshot: true);
+            }
         }
         else
         {
             DebugLog.Warning($"[AnimatedSpriteController] No animation frames found for {entityType}/{animationName}");
+            PersistentLogger.Error($"NO FRAMES LOADED for {entityType}/{animationName} - all 8 directions returned 0 frames!", "AnimSprite", captureScreenshot: true);
         }
     }
     
     /// <summary>
     /// Load all frames for a specific direction
-    /// Expects naming: {direction}_frame_0.png, {direction}_frame_1.png, etc.
+    /// Unified path structure: Heroes/{hero}/animations/{animation}/{direction}/frame_XXX.png
+    ///                         Enemies/{enemy}/animations/{animation}/{direction}/frame_XXX.png
     /// </summary>
     private Sprite[] LoadAnimationFrames(Direction8 direction)
     {
         string dirName = GetDirectionName(direction);
         
-        // Path format: Enemies/{entityType}/animations/{animationName}/{direction}/frame_XXX
-        // entityType should be lowercase (e.g., "skeleton", not "Skeleton")
-        string entityTypeLower = entityType.ToLower();
-        string basePath = $"Enemies/{entityTypeLower}/animations/{animationName}/{dirName}";
+        // Determine category (Heroes or Enemies) based on entityType
+        string category = entityType.StartsWith("Player", System.StringComparison.OrdinalIgnoreCase) ? "Heroes" : "Enemies";
+        string entityTypeLower = entityType.Replace("Player", "").ToLower();
         
-        DebugLog.Info($"[AnimatedSpriteController] Loading frames from: {basePath}/frame_XXX");
+        // Unified path: {category}/{entityType}/animations/{animationName}/{direction}/frame_XXX
+        string basePath = $"{category}/{entityTypeLower}/animations/{animationName}/{dirName}";
+        
+        DebugLog.Verbose($"[AnimatedSpriteController.LoadAnimationFrames] entityType='{entityType}', category='{category}', entityTypeLower='{entityTypeLower}', animationName='{animationName}', dirName='{dirName}'");
+        DebugLog.Verbose($"[AnimatedSpriteController.LoadAnimationFrames] Attempting to load from: '{basePath}/frame_XXX'");
         
         // Try to load frames - keep loading until we hit a missing frame
         List<Sprite> frames = new List<Sprite>();
@@ -143,17 +199,13 @@ public class AnimatedSpriteController : MonoBehaviour
         
         while (frameIndex < maxFrames)
         {
-            // Frame naming: frame_000.png, frame_001.png, etc.
+            // Unity imports PNGs as sprite atlases - try loading without the _0 suffix first
             string framePath = $"{basePath}/frame_{frameIndex:D3}";
             Sprite frame = SpriteLoader.LoadSprite(framePath);
             
             if (frame == null)
             {
-                // No more frames for this direction
-                if (frameIndex == 0)
-                {
-                    DebugLog.Warning($"[AnimatedSpriteController] No frames found at {framePath}");
-                }
+                // No more frames for this direction (expected when reaching end of sequence)
                 break;
             }
             
@@ -163,11 +215,13 @@ public class AnimatedSpriteController : MonoBehaviour
         
         if (frames.Count > 0)
         {
-            DebugLog.Info($"[AnimatedSpriteController] Loaded {frames.Count} frames from {basePath}");
+            DebugLog.Verbose($"[AnimatedSpriteController] Loaded {frames.Count} frames from {basePath}");
+            // Silent success - parent method will log summary
             return frames.ToArray();
         }
-        
-        DebugLog.Warning($"[AnimatedSpriteController] No frames loaded from {basePath}");
+
+        // Silent - SpriteLoader already logged error for missing entity
+        DebugLog.Verbose($"[AnimatedSpriteController] No frames loaded from {basePath}");
         return null;
     }
     
@@ -257,29 +311,42 @@ public class AnimatedSpriteController : MonoBehaviour
     /// <summary>
     /// Update the sprite renderer with current frame
     /// </summary>
-    private void UpdateSprite()
+    public void UpdateSprite()
     {
-        if (spriteRenderer == null || !isInitialized)
+        // CRITICAL: Check for null spriteRenderer and log error if missing
+        if (spriteRenderer == null)
+        {
+            PersistentLogger.Error($"UpdateSprite() called but spriteRenderer is NULL on {gameObject.name} (entity={entityType})", "AnimSprite", captureScreenshot: false);
+            // Try to get it again as a fallback
+            spriteRenderer = GetComponent<SpriteRenderer>();
+            if (spriteRenderer == null)
+            {
+                PersistentLogger.Error($"GetComponent<SpriteRenderer>() FAILED - no SpriteRenderer on {gameObject.name}", "AnimSprite", captureScreenshot: true);
+                return;
+            }
+        }
+
+        if (!isInitialized)
             return;
-        
+
         if (!animationCache.ContainsKey(currentDirection))
         {
             DebugLog.Warning($"[AnimatedSpriteController] No animation cached for direction {currentDirection}");
             return;
         }
-        
+
         Sprite[] frames = animationCache[currentDirection];
         if (frames.Length == 0)
             return;
-        
+
         // Clamp frame index
         currentFrame = Mathf.Clamp(currentFrame, 0, frames.Length - 1);
-        
+
         spriteRenderer.sprite = frames[currentFrame];
     }
     
     /// <summary>
-    /// Convert Direction8 enum to folder name (uses underscores)
+    /// Convert Direction8 enum to folder name (uses hyphens)
     /// </summary>
     private string GetDirectionName(Direction8 direction)
     {

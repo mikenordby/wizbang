@@ -8,6 +8,9 @@ using System.Collections.Generic;
 public static class SpriteLoader
 {
     private static Dictionary<string, Sprite> spriteCache = new Dictionary<string, Sprite>(32);
+
+    // Track which entities we've already logged errors for (prevent spam)
+    private static HashSet<string> loggedMissingEntities = new HashSet<string>();
     
     /// <summary>
     /// Load a sprite from Resources folder with caching
@@ -19,25 +22,57 @@ public static class SpriteLoader
         // Check cache first (O(1) lookup)
         if (spriteCache.TryGetValue(path, out Sprite cached))
         {
-            if (cached != null) return cached;
+            if (cached != null)
+            {
+                DebugLog.Verbose($"[SpriteLoader] CACHE HIT: {path}");
+                return cached;
+            }
             // Cached null means we already tried and failed - don't retry
+            DebugLog.Verbose($"[SpriteLoader] CACHE HIT (null): {path} - previous load failed");
             return null;
         }
-        
+
         // Try to load from Resources/Sprites/
         string fullPath = $"Sprites/{path}";
         Sprite sprite = Resources.Load<Sprite>(fullPath);
-        
+
         if (sprite != null)
         {
             spriteCache[path] = sprite;
+            // Silent success - no logging needed for successful loads (reduces log spam)
             DebugLog.Verbose($"[SpriteLoader] Loaded sprite: {fullPath}");
             return sprite;
         }
-        
+
+        // Load failed - try to diagnose why
+        // Only capture screenshot for frame_000 failures (critical), not for "no more frames" scenarios
+        bool isFirstFrame = path.EndsWith("/frame_000") || path.EndsWith("/frame_000_0");
+        bool captureScreenshot = isFirstFrame;
+
+        if (isFirstFrame)
+        {
+            // Extract entity name from path for deduplication
+            // Path format: "{category}/{entity}/animations/{anim}/{direction}/frame_000"
+            string[] pathParts = path.Split('/');
+            string entityKey = pathParts.Length >= 2 ? $"{pathParts[0]}/{pathParts[1]}" : path;
+
+            // Only log detailed error ONCE per entity
+            if (!loggedMissingEntities.Contains(entityKey))
+            {
+                PersistentLogger.Error($"Sprites missing for {pathParts[1]}: frame_000 not found in Assets/Resources/Sprites/{pathParts[0]}/{pathParts[1]}/animations/", "SpriteLoader", captureScreenshot: true);
+                loggedMissingEntities.Add(entityKey);
+            }
+            // Subsequent failures for same entity are silent (prevents 24 errors per spawn)
+        }
+        else
+        {
+            // Silent - frame not found usually means end of animation, no logging needed
+            DebugLog.Verbose($"[SpriteLoader] Frame not found: {fullPath} (expected - end of sequence)");
+        }
+
         // Don't cache null - let caller handle fallback (Verbose since procedural fallback is expected)
-        DebugLog.Verbose($"[SpriteLoader] Sprite not found in Resources, using procedural fallback: {fullPath}");
-        
+        DebugLog.Verbose($"[SpriteLoader] Sprite not found in Resources: {fullPath}");
+
         return null;
     }
     

@@ -12,10 +12,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: de01032e123c8f5439c6fd2a4622cd0a, type: 3}
   m_Name: DragonStats
   m_EditorClassIdentifier: Assembly-CSharp::EnemyStats
-  enemyName: Dragon
-  maxHealth: 60
-  contactDamage: 30
-  moveSpeed: 3.0
+  enemyName: dragon
+  maxHealth: 50
+  contactDamage: 15
+  moveSpeed: 1.5
   xpDrop: 10
-  color: {r: 0.9, g: 0.25, b: 0.15, a: 1}
-  scale: 2.0
+  color: {r: 1, g: 0.2, b: 0.2, a: 1}
+  scale: 1.2

@@ -13,6 +13,11 @@ public static class PersistentLogger
     private static string logFilePath;
     private static bool isInitialized = false;
     private static readonly object lockObj = new object();
+
+    /// <summary>
+    /// Check if logger is initialized (used by DebugLog for unified logging)
+    /// </summary>
+    public static bool IsInitialized => isInitialized;
     
     /// <summary>
     /// Initialize the logger. Creates a new log file with timestamp.
@@ -71,9 +76,14 @@ public static class PersistentLogger
     /// <summary>
     /// Log an error message with timestamp
     /// </summary>
-    public static void Error(string message, string category = null)
+    public static void Error(string message, string category = null, bool captureScreenshot = false)
     {
         Log("ERROR", message, category);
+
+        if (captureScreenshot)
+        {
+            CaptureScreenshot(category ?? "Error");
+        }
     }
     
     /// <summary>
@@ -141,6 +151,35 @@ public static class PersistentLogger
     {
         if (!isInitialized) Initialize();
         return logFilePath;
+    }
+
+    /// <summary>
+    /// Capture a screenshot and save it next to the log file
+    /// </summary>
+    public static void CaptureScreenshot(string label = "Screenshot")
+    {
+        if (!isInitialized) Initialize();
+
+        try
+        {
+            string timestamp = System.DateTime.Now.ToString("HH-mm-ss-fff");
+            string sanitizedLabel = label.Replace("/", "_").Replace("\\", "_").Replace(":", "_");
+            string screenshotFilename = $"screenshot_{sanitizedLabel}_{timestamp}.png";
+
+            string projectRoot = Path.GetDirectoryName(Application.dataPath);
+            string logsDir = Path.Combine(projectRoot, "AgentLogs");
+            string screenshotPath = Path.Combine(logsDir, screenshotFilename);
+
+            // Unity's ScreenCapture.CaptureScreenshot saves relative to project root
+            // We need to capture to the AgentLogs folder
+            UnityEngine.ScreenCapture.CaptureScreenshot(screenshotPath);
+
+            Log("INFO", $"Screenshot captured: {screenshotFilename}", "Screenshot");
+        }
+        catch (System.Exception ex)
+        {
+            Log("ERROR", $"Failed to capture screenshot: {ex.Message}", "Screenshot");
+        }
     }
     
     /// <summary>

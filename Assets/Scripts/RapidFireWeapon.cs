@@ -3,9 +3,9 @@ using UnityEngine;
 /// <summary>
 /// Rapid-fire pistol weapon that shoots at nearest enemy at high speed.
 /// Low damage, high fire rate - spray and pray!
-/// Implements IWeaponCollisionHandler for self-managed collision detection.
+/// Collision detection handled centrally by CollisionManager.ProcessProjectileCollisions()
 /// </summary>
-public class RapidFireWeapon : Weapon, IWeaponCollisionHandler
+public class RapidFireWeapon : Weapon
 {
     [Header("Rapid Fire Settings")]
     [Tooltip("Spread angle in degrees for bullet spread")]
@@ -28,9 +28,8 @@ public class RapidFireWeapon : Weapon, IWeaponCollisionHandler
         
         projectilePool = GameServices.ProjectilePool;
         
-        RegisterWithCollisionManager();
-        
-        DebugLog.Info("[RapidFireWeapon] Initialized - spray and pray!");
+        // NOTE: No longer registers with CollisionManager - collision detection is now centralized
+        DebugLog.Info("[RapidFireWeapon] Initialized - using centralized collision detection");
     }
     
     protected override void Fire()
@@ -111,22 +110,6 @@ public class RapidFireWeapon : Weapon, IWeaponCollisionHandler
         return nearest != null ? nearest.transform : null;
     }
     
-    #region IWeaponCollisionHandler Implementation
-    
-    /// <summary>
-    /// RapidFireWeapon shares the projectile pool with ProjectileWeapon.
-    /// We register but don't do collision checks here to avoid duplicate checks.
-    /// ProjectileWeapon handles collision detection for the shared pool.
-    /// </summary>
-    public void CheckCollisions(SpatialHashGrid grid, EnemyPool enemyPool)
-    {
-        // No-op: Collision detection handled by ProjectileWeapon for shared pool
-    }
-    
-    /// <summary>
-    /// Whether this weapon is active and should check collisions
-    /// </summary>
-    bool IWeaponCollisionHandler.IsActive => false; // Disable to avoid duplicate checks
-    
-    #endregion
+    // NOTE: No longer implements IWeaponCollisionHandler
+    // RapidFireWeapon shares the projectile pool - collision detection is centralized in CollisionManager
 }

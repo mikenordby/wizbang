@@ -9,11 +9,14 @@ public class LevelUpUI : MonoBehaviour
 {
     private static LevelUpUI instance;
     
+    [Header("Prefab References")]
+    [SerializeField] private GameObject upgradeOptionPrefab;
+    
     private GameObject levelUpPanel;
     private Text levelText;
     private Button rerollButton;
     private Text rerollText;
-    private List<Button> upgradeButtons = new List<Button>();
+    private List<GameObject> upgradeOptionObjects = new List<GameObject>();
     private List<UpgradeChoice> currentChoices = new List<UpgradeChoice>();
     
     private UpgradeChoiceGenerator choiceGenerator;
@@ -47,25 +50,9 @@ public class LevelUpUI : MonoBehaviour
     
     private void CreateUI()
     {
-        // Create EventSystem if it doesn't exist (required for UI input)
-        if (FindAnyObjectByType<UnityEngine.EventSystems.EventSystem>() == null)
-        {
-            GameObject eventSystemObj = new GameObject("EventSystem");
-            eventSystemObj.AddComponent<UnityEngine.EventSystems.EventSystem>();
-            eventSystemObj.AddComponent<UnityEngine.InputSystem.UI.InputSystemUIInputModule>();
-            DebugLog.Info("LevelUpUI: Created EventSystem with InputSystemUIInputModule for UI input");
-        }
-        
-        // Create canvas if it doesn't exist
-        Canvas canvas = FindAnyObjectByType<Canvas>();
-        if (canvas == null)
-        {
-            GameObject canvasObj = new GameObject("Canvas");
-            canvas = canvasObj.AddComponent<Canvas>();
-            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            canvasObj.AddComponent<CanvasScaler>();
-            canvasObj.AddComponent<GraphicRaycaster>();
-        }
+        // Use UIManager to get/create Canvas and EventSystem (prevents duplicates)
+        Canvas canvas = UIManager.GetOrCreateCanvas();
+        UIManager.GetOrCreateEventSystem();
         
         // Create level-up panel
         levelUpPanel = new GameObject("LevelUpPanel");
@@ -95,42 +82,43 @@ public class LevelUpUI : MonoBehaviour
         textRect.sizeDelta = new Vector2(600, 100);
         textRect.anchoredPosition = Vector2.zero;
         
-        // Create 3 upgrade choice buttons
-        float[] buttonXPositions = { -280f, 0f, 280f };
+        // Create 3 upgrade choice options (from prefab or procedurally)
+        upgradeOptionObjects.Clear();
+        
+        bool usingPrefab = (upgradeOptionPrefab != null);
+        
+        if (!usingPrefab)
+        {
+            DebugLog.Warning("[LevelUpUI] UpgradeOption prefab not assigned. Using procedural fallback.");
+            DebugLog.Warning("[LevelUpUI] For better visuals, create a prefab and assign it in the Inspector.");
+        }
+        
+        float[] buttonXPositions = { -360f, 0f, 360f };  // Wider spacing for larger cards
         for (int i = 0; i < 3; i++)
         {
-            GameObject buttonObj = new GameObject($"UpgradeButton{i}");
-            buttonObj.transform.SetParent(levelUpPanel.transform, false);
-            Button button = buttonObj.AddComponent<Button>();
-            upgradeButtons.Add(button);
+            GameObject optionGO;
+            if (usingPrefab)
+            {
+                optionGO = Instantiate(upgradeOptionPrefab, levelUpPanel.transform);
+            }
+            else
+            {
+                optionGO = UIComponentFactory.CreateUpgradeOption(levelUpPanel.transform);
+            }
             
-            Image buttonImage = buttonObj.AddComponent<Image>();
-            buttonImage.color = new Color(0.2f, 0.6f, 0.8f); // Blue
+            optionGO.name = $"UpgradeOption{i}";
             
-            RectTransform buttonRect = buttonObj.GetComponent<RectTransform>();
-            buttonRect.anchorMin = new Vector2(0.5f, 0.5f);
-            buttonRect.anchorMax = new Vector2(0.5f, 0.5f);
-            buttonRect.sizeDelta = new Vector2(240, 220);
-            buttonRect.anchoredPosition = new Vector2(buttonXPositions[i], 0);
+            // Position the option
+            RectTransform optionRect = optionGO.GetComponent<RectTransform>();
+            if (optionRect != null)
+            {
+                optionRect.anchorMin = new Vector2(0.5f, 0.5f);
+                optionRect.anchorMax = new Vector2(0.5f, 0.5f);
+                optionRect.anchoredPosition = new Vector2(buttonXPositions[i], 0);
+            }
             
-            // Button text (category + name + description)
-            GameObject buttonTextObj = new GameObject("Text");
-            buttonTextObj.transform.SetParent(buttonObj.transform, false);
-            Text buttonText = buttonTextObj.AddComponent<Text>();
-            buttonText.text = "Upgrade Option";
-            buttonText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            buttonText.fontSize = 16;
-            buttonText.alignment = TextAnchor.MiddleCenter;
-            buttonText.color = Color.white;
-            
-            RectTransform buttonTextRect = buttonTextObj.GetComponent<RectTransform>();
-            buttonTextRect.anchorMin = Vector2.zero;
-            buttonTextRect.anchorMax = Vector2.one;
-            buttonTextRect.sizeDelta = new Vector2(-20, -20);
-            
-            // Hook up button click
-            int buttonIndex = i;
-            button.onClick.AddListener(() => OnUpgradeChosen(buttonIndex));
+            upgradeOptionObjects.Add(optionGO);
+            DebugLog.Verbose($"[LevelUpUI] Created upgrade option {i}");
         }
         
         // Create reroll button
@@ -214,41 +202,31 @@ public class LevelUpUI : MonoBehaviour
             return;
         }
         
-        // Update buttons with choices
-        for (int i = 0; i < upgradeButtons.Count; i++)
+        // Update upgrade options with choices
+        for (int i = 0; i < upgradeOptionObjects.Count; i++)
         {
             if (i < currentChoices.Count)
             {
                 UpgradeChoice choice = currentChoices[i];
+                GameObject optionGO = upgradeOptionObjects[i];
                 
-                // Color code by category
-                Color categoryColor = choice.Type switch
+                // Get UpgradeOption component and initialize it
+                UpgradeOption option = optionGO.GetComponent<UpgradeOption>();
+                if (option != null)
                 {
-                    UpgradeChoice.ChoiceType.NewWeapon => new Color(1f, 0.3f, 0.3f), // Red
-                    UpgradeChoice.ChoiceType.WeaponUpgrade => new Color(0.3f, 0.8f, 1f), // Cyan
-                    UpgradeChoice.ChoiceType.PlayerStat => new Color(0.4f, 1f, 0.4f), // Green
-                    _ => Color.white
-                };
-                
-                upgradeButtons[i].GetComponent<Image>().color = categoryColor;
-                
-                // Format text: Category badge + name + description
-                string categoryLabel = choice.Type switch
+                    int choiceIndex = i;
+                    option.Initialize(choice, (selectedChoice) => OnUpgradeChosen(choiceIndex));
+                    optionGO.SetActive(true);
+                }
+                else
                 {
-                    UpgradeChoice.ChoiceType.NewWeapon => "[NEW WEAPON]",
-                    UpgradeChoice.ChoiceType.WeaponUpgrade => "[UPGRADE]",
-                    UpgradeChoice.ChoiceType.PlayerStat => "[STAT]",
-                    _ => ""
-                };
-                
-                upgradeButtons[i].GetComponentInChildren<Text>().text = 
-                    $"{categoryLabel}\n\n{choice.DisplayName}\n\n{choice.Description}";
-                
-                upgradeButtons[i].gameObject.SetActive(true);
+                    DebugLog.Error($"[LevelUpUI] UpgradeOption component not found on upgrade option {i}!");
+                    optionGO.SetActive(false);
+                }
             }
             else
             {
-                upgradeButtons[i].gameObject.SetActive(false);
+                upgradeOptionObjects[i].SetActive(false);
             }
         }
         

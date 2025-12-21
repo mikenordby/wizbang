@@ -14,18 +14,21 @@ using System.Collections.Generic;
 /// </summary>
 public class CharacterSelectionUI : MonoBehaviour
 {
-    [Header("References")]
-    [SerializeField] private List<CharacterData> availableCharacters = new List<CharacterData>();
+    [Header("Prefab References")]
+    [SerializeField] private GameObject characterCardPrefab;
     
-    [Header("Character Unlocking")]
-    [SerializeField] private List<string> unlockedCharacterNames = new List<string> { "Wizard", "Knight" }; // Default unlocked
+    [Header("Hero Data")]
+    [SerializeField] private List<HeroDefinition> availableHeroes = new List<HeroDefinition>();
+    
+    [Header("Hero Unlocking")]
+    [SerializeField] private List<string> unlockedHeroIds = new List<string> { "wizard", "knight" }; // Default unlocked
     
     private GameObject selectionPanel;
     private GameObject characterGrid;
     private GameObject previewPanel;
     private List<Button> characterButtons = new List<Button>();
-    private CharacterData selectedCharacter;
-    private CharacterData hoveredCharacter;
+    private HeroDefinition selectedHero;
+    private HeroDefinition hoveredHero;
     
     // UI Elements
     private Text previewName;
@@ -34,8 +37,8 @@ public class CharacterSelectionUI : MonoBehaviour
     private Image previewPortrait;
     private GameObject lockedOverlay;
     
-    public CharacterData SelectedCharacter => selectedCharacter;
-    public bool HasSelectedCharacter => selectedCharacter != null;
+    public HeroDefinition SelectedHero => selectedHero;
+    public bool HasSelectedHero => selectedHero != null;
     
     private void Awake()
     {
@@ -46,68 +49,53 @@ public class CharacterSelectionUI : MonoBehaviour
             GamePhaseManager.TransitionToCharacterSelection();
         }
         
-        // Load character data assets if not assigned
-        if (availableCharacters.Count == 0)
+        // Load hero definition assets if not assigned
+        if (availableHeroes.Count == 0)
         {
-            LoadCharacterAssets();
+            LoadHeroAssets();
         }
         
         CreateEnhancedUI();
         ShowSelectionScreen();
     }
     
-    private void LoadCharacterAssets()
+    private void LoadHeroAssets()
     {
-        // Try to load character data from Resources
-        CharacterData[] characters = Resources.LoadAll<CharacterData>("Characters");
-        if (characters.Length > 0)
+        // Try to load HeroDefinition assets from Resources/Characters
+        HeroDefinition[] heroes = Resources.LoadAll<HeroDefinition>("Characters");
+        if (heroes.Length > 0)
         {
-            availableCharacters.AddRange(characters);
-            DebugLog.Info($"[CharacterSelectionUI] Loaded {characters.Length} characters from Resources/Characters");
+            availableHeroes.AddRange(heroes);
+            DebugLog.Info($"[CharacterSelectionUI] Loaded {heroes.Length} hero(es) from Resources/Characters");
+            
+            // Log what was loaded
+            foreach (var hero in heroes)
+            {
+                DebugLog.Info($"[CharacterSelectionUI]   - {hero.displayName} (id: {hero.heroId})");
+            }
         }
         else
         {
-            DebugLog.Warning("[CharacterSelectionUI] No characters found in Resources/Characters.");
+            DebugLog.Warning("[CharacterSelectionUI] No heroes found in Resources/Characters");
+            DebugLog.Warning("[CharacterSelectionUI] Make sure HeroDefinition assets exist in Assets/Resources/Characters/");
         }
     }
     
-    private bool IsCharacterUnlocked(CharacterData character)
+    private bool IsHeroUnlocked(HeroDefinition hero)
     {
-        return unlockedCharacterNames.Contains(character.characterName);
+        return unlockedHeroIds.Contains(hero.heroId);
     }
     
     private void CreateEnhancedUI()
     {
-        Debug.LogError("[CharacterSelectionUI] CreateEnhancedUI started");
-        // Create EventSystem if needed
-        if (FindAnyObjectByType<UnityEngine.EventSystems.EventSystem>() == null)
-        {
-            DebugLog.Verbose("[CharacterSelectionUI] Creating EventSystem");
-            GameObject eventSystemObj = new GameObject("EventSystem");
-            eventSystemObj.AddComponent<UnityEngine.EventSystems.EventSystem>();
-            eventSystemObj.AddComponent<UnityEngine.InputSystem.UI.InputSystemUIInputModule>();
-            DebugLog.Verbose("[CharacterSelectionUI] EventSystem created successfully");
-        }
-        else
-        {
-            DebugLog.Verbose("[CharacterSelectionUI] EventSystem already exists");
-        }
+        DebugLog.Verbose("[CharacterSelectionUI] CreateEnhancedUI started");
         
-        // Create canvas
-        Canvas canvas = FindAnyObjectByType<Canvas>();
-        if (canvas == null)
-        {
-            GameObject canvasObj = new GameObject("CharacterSelectionCanvas");
-            canvas = canvasObj.AddComponent<Canvas>();
-            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            canvas.sortingOrder = 1000;
-            canvasObj.AddComponent<CanvasScaler>();
-            canvasObj.AddComponent<GraphicRaycaster>();
-        }
-        else
-        {
-            canvas.sortingOrder = 1000;
-        }
+        // Use UIManager to get/create Canvas and EventSystem (prevents duplicates)
+        Canvas canvas = UIManager.GetOrCreateCanvas();
+        UIManager.GetOrCreateEventSystem();
+        
+        // Set canvas to high sorting order for character selection screen
+        canvas.sortingOrder = 1000;
         
         // Main selection panel
         selectionPanel = new GameObject("CharacterSelectionPanel");
@@ -292,165 +280,89 @@ public class CharacterSelectionUI : MonoBehaviour
     
     private void CreateCharacterButtonsWithPortraits()
     {
-        if (availableCharacters == null || availableCharacters.Count == 0)
+        if (availableHeroes == null || availableHeroes.Count == 0)
         {
-            Debug.LogWarning("No character data loaded for selection screen!");
+            DebugLog.Warning("[CharacterSelectionUI] No hero definitions loaded for selection screen!");
             return;
         }
         
-        int characterCount = availableCharacters.Count;
-        int columns = Mathf.CeilToInt(Mathf.Sqrt(characterCount));
-        int rows = Mathf.CeilToInt((float)characterCount / columns);
+        bool usingPrefab = (characterCardPrefab != null);
+        
+        if (!usingPrefab)
+        {
+            DebugLog.Warning("[CharacterSelectionUI] CharacterCard prefab not assigned. Using procedural fallback.");
+            DebugLog.Warning("[CharacterSelectionUI] For better visuals, create a prefab and assign it in the Inspector.");
+        }
+        
+        int heroCount = availableHeroes.Count;
+        // Use 3 columns for better scalability (supports up to 6+ heroes nicely)
+        int columns = 3;
+        int rows = Mathf.CeilToInt((float)heroCount / columns);
         
         float cardWidth = 250f;
         float cardHeight = 320f;
         float spacing = 30f;
         
-        for (int i = 0; i < characterCount; i++)
+        DebugLog.Info($"[CharacterSelectionUI] Creating {heroCount} character cards from prefabs (grid: {columns}x{rows})");
+        
+        for (int i = 0; i < heroCount; i++)
         {
-            CharacterData character = availableCharacters[i];
-            bool isUnlocked = IsCharacterUnlocked(character);
+            HeroDefinition hero = availableHeroes[i];
+            bool isUnlocked = IsHeroUnlocked(hero);
             
+            // Calculate grid position
             int col = i % columns;
             int row = i / columns;
-            
-            // Character card container
-            GameObject cardObj = new GameObject($"Card_{character.characterName}");
-            cardObj.transform.SetParent(characterGrid.transform, false);
-            
-            Image cardBg = cardObj.AddComponent<Image>();
-            cardBg.color = isUnlocked ? new Color(0.15f, 0.15f, 0.2f, 0.9f) : new Color(0.1f, 0.1f, 0.1f, 0.7f);
-            
-            RectTransform cardRect = cardObj.GetComponent<RectTransform>();
-            cardRect.anchorMin = Vector2.zero;
-            cardRect.anchorMax = Vector2.zero;
-            cardRect.sizeDelta = new Vector2(cardWidth, cardHeight);
-            
             float xPos = col * (cardWidth + spacing) + cardWidth / 2;
             float yPos = (rows - 1 - row) * (cardHeight + spacing) + cardHeight / 2;
-            cardRect.anchoredPosition = new Vector2(xPos, yPos);
             
-            // Portrait image (top section)
-            GameObject portraitObj = new GameObject("Portrait");
-            portraitObj.transform.SetParent(cardObj.transform, false);
-            Image portraitImg = portraitObj.AddComponent<Image>();
-            portraitImg.color = new Color(0.3f, 0.3f, 0.3f); // Placeholder gray
-            
-            RectTransform portraitRect = portraitObj.GetComponent<RectTransform>();
-            portraitRect.anchorMin = new Vector2(0.1f, 0.4f);
-            portraitRect.anchorMax = new Vector2(0.9f, 0.9f);
-            portraitRect.sizeDelta = Vector2.zero;
-            
-            // Try to load character sprite as portrait
-            LoadPortraitForCharacter(character, portraitImg);
-            
-            // Character name
-            GameObject nameObj = new GameObject("Name");
-            nameObj.transform.SetParent(cardObj.transform, false);
-            Text nameText = nameObj.AddComponent<Text>();
-            nameText.text = character.characterName;
-            nameText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            nameText.fontSize = 24;
-            nameText.alignment = TextAnchor.MiddleCenter;
-            nameText.color = isUnlocked ? Color.white : new Color(0.5f, 0.5f, 0.5f);
-            nameText.fontStyle = FontStyle.Bold;
-            
-            RectTransform nameRect = nameObj.GetComponent<RectTransform>();
-            nameRect.anchorMin = new Vector2(0f, 0.25f);
-            nameRect.anchorMax = new Vector2(1f, 0.38f);
-            nameRect.sizeDelta = Vector2.zero;
-            
-            // Starting weapon indicator
-            GameObject weaponObj = new GameObject("Weapon");
-            weaponObj.transform.SetParent(cardObj.transform, false);
-            Text weaponText = weaponObj.AddComponent<Text>();
-            weaponText.text = GetWeaponDisplayName(character.startingWeaponType);
-            weaponText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            weaponText.fontSize = 14;
-            weaponText.alignment = TextAnchor.MiddleCenter;
-            weaponText.color = new Color(0.7f, 0.9f, 1f);
-            
-            RectTransform weaponRect = weaponObj.GetComponent<RectTransform>();
-            weaponRect.anchorMin = new Vector2(0f, 0.12f);
-            weaponRect.anchorMax = new Vector2(1f, 0.24f);
-            weaponRect.sizeDelta = Vector2.zero;
-            
-            // Button component for selection
-            Button cardButton = cardObj.AddComponent<Button>();
-            cardButton.interactable = isUnlocked;
-            cardButton.targetGraphic = cardBg;
-            
-            ColorBlock colors = cardButton.colors;
-            colors.normalColor = isUnlocked ? new Color(0.15f, 0.15f, 0.2f, 0.9f) : new Color(0.1f, 0.1f, 0.1f, 0.7f);
-            colors.highlightedColor = isUnlocked ? new Color(0.25f, 0.25f, 0.35f, 1f) : colors.normalColor;
-            colors.pressedColor = isUnlocked ? new Color(0.3f, 0.3f, 0.45f, 1f) : colors.normalColor;
-            colors.disabledColor = new Color(0.1f, 0.1f, 0.1f, 0.5f);
-            cardButton.colors = colors;
-            
-            CharacterData capturedCharacter = character;
-            DebugLog.Verbose($"[CharacterSelectionUI] Setting up button for {capturedCharacter.characterName}, interactable={cardButton.interactable}");
-            cardButton.onClick.AddListener(() => {
-                DebugLog.Verbose($"[CharacterSelectionUI] Button clicked for: {capturedCharacter?.characterName ?? "NULL"}");
-                SelectCharacter(capturedCharacter);
-            });
-            
-            // Hover events using EventTrigger
-            EventTrigger trigger = cardObj.AddComponent<EventTrigger>();
-            
-            EventTrigger.Entry entryEnter = new EventTrigger.Entry { eventID = EventTriggerType.PointerEnter };
-            entryEnter.callback.AddListener((data) => { OnCharacterHover(capturedCharacter); });
-            trigger.triggers.Add(entryEnter);
-            
-            EventTrigger.Entry entryExit = new EventTrigger.Entry { eventID = EventTriggerType.PointerExit };
-            entryExit.callback.AddListener((data) => { OnCharacterHoverExit(); });
-            trigger.triggers.Add(entryExit);
-            
-            // Locked overlay on card
-            if (!isUnlocked)
+            // Create character card (from prefab or procedurally)
+            GameObject cardGO;
+            if (usingPrefab)
             {
-                GameObject lockIconObj = new GameObject("LockIcon");
-                lockIconObj.transform.SetParent(cardObj.transform, false);
-                
-                Image lockIcon = lockIconObj.AddComponent<Image>();
-                lockIcon.color = new Color(1f, 0f, 0f, 0.6f);
-                
-                RectTransform lockRect = lockIconObj.GetComponent<RectTransform>();
-                lockRect.anchorMin = new Vector2(0.4f, 0.6f);
-                lockRect.anchorMax = new Vector2(0.6f, 0.75f);
-                lockRect.sizeDelta = Vector2.zero;
-                
-                GameObject lockTextObj = new GameObject("LockText");
-                lockTextObj.transform.SetParent(lockIconObj.transform, false);
-                Text lockText = lockTextObj.AddComponent<Text>();
-                lockText.text = "🔒";
-                lockText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-                lockText.fontSize = 48;
-                lockText.alignment = TextAnchor.MiddleCenter;
-                lockText.color = Color.white;
-                
-                RectTransform lockTextRect = lockTextObj.GetComponent<RectTransform>();
-                lockTextRect.anchorMin = Vector2.zero;
-                lockTextRect.anchorMax = Vector2.one;
-                lockTextRect.sizeDelta = Vector2.zero;
+                cardGO = Instantiate(characterCardPrefab, characterGrid.transform);
+            }
+            else
+            {
+                cardGO = UIComponentFactory.CreateCharacterCard(characterGrid.transform);
+            }
+            
+            cardGO.name = $"Card_{hero.displayName}";
+            
+            // Position the card in the grid
+            RectTransform cardRect = cardGO.GetComponent<RectTransform>();
+            if (cardRect != null)
+            {
+                cardRect.anchorMin = Vector2.zero;
+                cardRect.anchorMax = Vector2.zero;
+                cardRect.anchoredPosition = new Vector2(xPos, yPos);
+            }
+            
+            // Initialize the CharacterCard component with hero data
+            CharacterCard card = cardGO.GetComponent<CharacterCard>();
+            if (card != null)
+            {
+                card.Initialize(hero, isUnlocked, OnHeroHover, SelectHero);
+                DebugLog.Verbose($"[CharacterSelectionUI] Initialized card for {hero.displayName} (unlocked={isUnlocked})");
+            }
+            else
+            {
+                DebugLog.Error($"[CharacterSelectionUI] CharacterCard component not found! Card for {hero.displayName} will not function.");
             }
         }
+        
+        DebugLog.Info($"[CharacterSelectionUI] Successfully created all character cards");
     }
     
-    private void LoadPortraitForCharacter(CharacterData character, Image portraitImage)
+    private void OnHeroHover(HeroDefinition hero)
     {
-        // Try to load character sprite as portrait
-        Sprite characterSprite = SpriteLoader.LoadCharacterSprite(character.spriteType, "south");
-        if (characterSprite != null)
-        {
-            portraitImage.sprite = characterSprite;
-            portraitImage.color = Color.white;
-        }
-        else
-        {
-            Debug.LogWarning($"Could not load portrait sprite for {character.characterName}");
-        }
+        hoveredHero = hero;
+        UpdatePreviewPanel(hero);
     }
     
+    /// <summary>
+    /// Helper method to get display name for weapon types with icons.
+    /// </summary>
     private string GetWeaponDisplayName(string weaponType)
     {
         switch (weaponType)
@@ -460,46 +372,43 @@ public class CharacterSelectionUI : MonoBehaviour
             case "BoomerangWeapon": return "🪃 Boomerang";
             case "OrbiterWeapon": return "⭕ Orbiting Blades";
             case "FireRingWeapon": return "🔥 Circle of Fire";
+            case "LaserWeapon": return "⚡ Piercing Laser";
+            case "LightningWeapon": return "⚡ Chain Lightning";
+            case "PoisonWeapon": return "☠️ Poison Cloud";
             default: return weaponType;
         }
     }
     
-    private void OnCharacterHover(CharacterData character)
+    private void OnHeroHoverExit()
     {
-        hoveredCharacter = character;
-        UpdatePreviewPanel(character);
-    }
-    
-    private void OnCharacterHoverExit()
-    {
-        hoveredCharacter = null;
+        hoveredHero = null;
         ClearPreviewPanel();
     }
     
-    private void UpdatePreviewPanel(CharacterData character)
+    private void UpdatePreviewPanel(HeroDefinition hero)
     {
         if (previewPanel == null) return;
         
-        bool isUnlocked = IsCharacterUnlocked(character);
+        bool isUnlocked = IsHeroUnlocked(hero);
         
-        previewName.text = character.characterName;
-        previewDescription.text = character.description;
+        previewName.text = hero.displayName;
+        previewDescription.text = hero.description;
         
         // Load portrait in preview panel
-        Sprite characterSprite = SpriteLoader.LoadCharacterSprite(character.spriteType, "south");
-        if (characterSprite != null)
+        Sprite heroSprite = SpriteLoader.LoadCharacterSprite(hero.spriteType, "south");
+        if (heroSprite != null)
         {
-            previewPortrait.sprite = characterSprite;
+            previewPortrait.sprite = heroSprite;
             previewPortrait.color = Color.white;
         }
         
         // Display stats
         string statsText = $"<b>STATS</b>\n\n";
-        statsText += $"⚡ Speed: {character.moveSpeedModifier:F2}x\n";
-        statsText += $"❤️ Health: {character.baseMaxHealth:F0}\n";
-        statsText += $"⚔️ Damage: {character.damageModifier:F2}x\n";
+        statsText += $"⚡ Speed: {hero.baseMoveSpeed:F2}x\n";
+        statsText += $"❤️ Health: {hero.baseMaxHealth:F0}\n";
+        statsText += $"⚔️ Damage: {hero.baseDamage:F2}x\n";
         statsText += $"\n<b>Starting Weapon:</b>\n";
-        statsText += GetWeaponDisplayName(character.startingWeaponType);
+        statsText += GetWeaponDisplayName(hero.startingWeaponType);
         
         previewStats.text = statsText;
         
@@ -527,30 +436,30 @@ public class CharacterSelectionUI : MonoBehaviour
     }
 
     
-    private void SelectCharacter(CharacterData character)
+    private void SelectHero(HeroDefinition hero)
     {
-        DebugLog.Info($"[CharacterSelectionUI] SelectCharacter called for: {character?.characterName ?? "NULL"}");
-        OnCharacterSelected(character);
+        DebugLog.Info($"[CharacterSelectionUI] SelectHero called for: {hero?.displayName ?? "NULL"}");
+        OnHeroSelected(hero);
     }
     
-    private string GetCharacterStatsText(CharacterData character)
+    private string GetHeroStatsText(HeroDefinition hero)
     {
-        return $"Health: {character.baseMaxHealth:F0}\n" +
-               $"Move Speed: {character.moveSpeedModifier:F1}x\n" +
-               $"Damage: {character.damageModifier:F1}x\n" +
-               $"Starting Weapon:\n{character.startingWeaponType}";
+        return $"Health: {hero.baseMaxHealth:F0}\n" +
+               $"Move Speed: {hero.baseMoveSpeed:F1}x\n" +
+               $"Damage: {hero.baseDamage:F1}x\n" +
+               $"Starting Weapon:\n{hero.startingWeaponType}";
     }
     
-    private void OnCharacterSelected(CharacterData character)
+    private void OnHeroSelected(HeroDefinition hero)
     {
-        selectedCharacter = character;
-        DebugLog.Info($"[CharacterSelectionUI] Selected: {character.characterName}");
+        selectedHero = hero;
+        DebugLog.Info($"[CharacterSelectionUI] Selected: {hero.displayName}");
         
         // Hide selection screen
         HideSelectionScreen();
         
-        // Initialize player with selected character
-        InitializePlayerCharacter();
+        // Initialize player with selected hero
+        InitializePlayerHero();
 
         // CRITICAL: Transition to gameplay AFTER player initialization
         DebugLog.Verbose($"[CharacterSelectionUI] About to call TransitionToGameplay, current phase: {GamePhaseManager.CurrentPhase}");
@@ -558,7 +467,7 @@ public class CharacterSelectionUI : MonoBehaviour
         DebugLog.Info($"[CharacterSelectionUI] After TransitionToGameplay, current phase: {GamePhaseManager.CurrentPhase}");
     }
     
-    private void InitializePlayerCharacter()
+    private void InitializePlayerHero()
     {
         GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
         if (playerObj == null)
@@ -574,10 +483,10 @@ public class CharacterSelectionUI : MonoBehaviour
             return;
         }
         
-        // Apply character data to player
-        player.InitializeWithCharacter(selectedCharacter);
+        // Apply hero definition to player
+        player.InitializeWithHero(selectedHero);
         
-        DebugLog.Info($"[CharacterSelectionUI] Initialized player as {selectedCharacter.characterName}");
+        DebugLog.Info($"[CharacterSelectionUI] Initialized player as {selectedHero.displayName}");
     }
     
     public void ShowSelectionScreen()

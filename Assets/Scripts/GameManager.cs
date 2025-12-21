@@ -20,12 +20,7 @@ public class GameManager : MonoBehaviour
         GameObject menuObj = new GameObject("MainMenu");
         mainMenu = menuObj.AddComponent<MainMenuUI>();
         
-        // Add debug visualizer to Main Camera for OnRenderObject to work
-        Camera mainCam = Camera.main;
-        if (mainCam != null && mainCam.GetComponent<CollisionDebugVisualizer>() == null)
-        {
-            mainCam.gameObject.AddComponent<CollisionDebugVisualizer>();
-        }
+        // Debug visualizer removed during cleanup (can be re-added if needed for debugging)
     }
     
     private void OnDestroy()

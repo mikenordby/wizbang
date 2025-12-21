@@ -1,13 +1,18 @@
 using UnityEngine;
 
 /// <summary>
-/// Player character stats, progression, and state management
+/// Player character runtime state and progression.
+/// Separated from HeroDefinition (identity) for cleaner architecture.
+/// Uses HeroStats for composable stat modifiers from upgrades/items/buffs.
 /// </summary>
 public class Player : MonoBehaviour, ICollidable
 {
-    [Header("Character")]
-    private CharacterData characterData;
+    [Header("Hero Identity (Immutable)")]
+    [SerializeField] private HeroDefinition heroDefinition; // What the hero IS
     private bool isInitialized = false;
+    
+    [Header("Runtime Stat Modifiers")]
+    private HeroStats stats; // Accumulates bonuses from upgrades/items/buffs
     
     [Header("Level & XP")]
     [SerializeField] private int currentLevel = 1;
@@ -15,121 +20,104 @@ public class Player : MonoBehaviour, ICollidable
     private int xpToNextLevel = 100;
     private LevelUpUI levelUpUI;
     
-    [Header("Combat Stats")]
-    [Tooltip("Global damage multiplier for all weapons")]
-    [SerializeField] private float damageMultiplier = 1f;
-    
-    [Tooltip("Attack speed multiplier for all weapons")]
-    [SerializeField] private float attackSpeedMultiplier = 1f;
-    
-    [Tooltip("Projectile speed multiplier")]
-    [SerializeField] private float projectileSpeedMultiplier = 1f;
-    
-    [Tooltip("Critical hit chance (0-1)")]
-    [SerializeField] private float critChance = 0f;
-    
-    [Tooltip("Critical hit damage multiplier")]
-    [SerializeField] private float critDamage = 2f;
-    
-    [Header("Defensive Stats")]
-    [Tooltip("Damage reduction percentage (0-1)")]
-    [SerializeField] private float damageReduction = 0f;
-    
-    [Tooltip("Max health modifier")]
-    [SerializeField] private float maxHealthMultiplier = 1f;
-    
-    [Tooltip("Health regeneration per second")]
-    [SerializeField] private float healthRegen = 0f;
-    
-    [Header("Utility Stats")]
-    [Tooltip("Movement speed multiplier")]
-    [SerializeField] private float moveSpeedMultiplier = 1f;
-    
-    [Tooltip("XP collection radius")]
-    [SerializeField] private float xpMagnetRange = 2f;
-    
-    [Tooltip("Pickup radius for items")]
-    [SerializeField] private float pickupRadius = 0.5f;
-    
-    [Tooltip("Luck stat (affects drop rates, crits, etc)")]
-    [SerializeField] private float luck = 0f;
-    
-    // ICollidable implementation
-    public Vector3 Position => transform.position;
-    public float CollisionRadius => 0.4f; // Wizard body: 128px sprite at 128 PPU = ~0.8 diameter
-    public bool IsActive => true; // Player always active
-    public CollisionLayer Layer => CollisionLayer.Player;
-    
-    [Header("Weapon Stats")]
-    [Tooltip("Max weapon slots available")]
+    [Header("Weapon Bonuses")]
     [SerializeField] private int maxWeaponSlots = 4;
-    
-    [Tooltip("Projectile pierce count bonus")]
     [SerializeField] private int bonusPierce = 0;
-    
-    [Tooltip("Additional projectile count")]
     [SerializeField] private int bonusProjectiles = 0;
     
-    [Tooltip("Area of effect size multiplier")]
-    [SerializeField] private float aoeMultiplier = 1f;
-    
-    [Tooltip("Projectile duration/range multiplier")]
-    [SerializeField] private float rangeMultiplier = 1f;
-    
-    [Tooltip("Projectile visual and hitbox size multiplier")]
-    [SerializeField] private float projectileSizeMultiplier = 1f;
-    
-    [Header("Runtime Stats")]
+    [Header("Runtime Statistics")]
     [SerializeField] private int enemiesKilled = 0;
     [SerializeField] private float damageDealt = 0f;
     [SerializeField] private float damageTaken = 0f;
     
-    // Component references
-    private DirectionalSpriteController directionController;
+    // Component references (none needed - components are accessed via GetComponent when needed)
     
-    // Properties for easy access
+    // ICollidable implementation
+    public Vector3 Position => transform.position;
+    public float CollisionRadius => 0.4f;
+    public bool IsActive => true;
+    public CollisionLayer Layer => CollisionLayer.Player;
+    
+    // Properties - Compute final values using base + modifiers
     public int CurrentLevel => currentLevel;
     public int CurrentXP => currentXP;
     public int XPToNextLevel => xpToNextLevel;
     public float XPProgress => (float)currentXP / xpToNextLevel;
     
-    public float DamageMultiplier => damageMultiplier;
-    public float AttackSpeedMultiplier => attackSpeedMultiplier;
-    public float ProjectileSpeedMultiplier => projectileSpeedMultiplier;
-    public float CritChance => critChance;
-    public float CritDamage => critDamage;
+    // Combat stats (base from HeroDefinition + modifiers from HeroStats)
+    public float DamageMultiplier => heroDefinition != null && stats != null 
+        ? stats.GetFinalValue(StatType.Damage, heroDefinition.baseDamage) 
+        : 1f;
     
-    public float DamageReduction => damageReduction;
-    public float MaxHealthMultiplier => maxHealthMultiplier;
-    public float HealthRegen => healthRegen;
+    public float AttackSpeedMultiplier => heroDefinition != null && stats != null 
+        ? stats.GetFinalValue(StatType.AttackSpeed, heroDefinition.baseAttackSpeed) 
+        : 1f;
     
-    public float MoveSpeedMultiplier => moveSpeedMultiplier;
-    public float XPMagnetRange => xpMagnetRange;
-    public float PickupRadius => pickupRadius;
-    public float Luck => luck;
+    public float ProjectileSpeedMultiplier => 1f; // TODO: Add to HeroDefinition if needed
     
+    public float CritChance => heroDefinition != null && stats != null 
+        ? stats.GetFinalValue(StatType.CritChance, heroDefinition.baseCritChance) 
+        : 0f;
+    
+    public float CritDamage => heroDefinition != null && stats != null 
+        ? stats.GetFinalValue(StatType.CritDamage, heroDefinition.baseCritDamage) 
+        : 2f;
+    
+    // Defensive stats
+    public float DamageReduction => stats != null 
+        ? stats.GetFinalValue(StatType.DamageReduction, 0f) 
+        : 0f;
+    
+    public float MaxHealthMultiplier => 1f; // Kept for Health component compatibility
+    
+    public float HealthRegen => heroDefinition != null && stats != null 
+        ? stats.GetFinalValue(StatType.HealthRegen, heroDefinition.baseHealthRegen) 
+        : 0f;
+    
+    // Utility stats
+    public float MoveSpeedMultiplier => heroDefinition != null && stats != null 
+        ? stats.GetFinalValue(StatType.MoveSpeed, heroDefinition.baseMoveSpeed) 
+        : 1f;
+    
+    public float XPMagnetRange => heroDefinition != null && stats != null 
+        ? stats.GetFinalValue(StatType.XPMagnetRange, heroDefinition.baseXPMagnetRange) 
+        : 2f;
+    
+    public float PickupRadius => heroDefinition != null && stats != null 
+        ? stats.GetFinalValue(StatType.PickupRadius, heroDefinition.basePickupRadius) 
+        : 0.5f;
+    
+    public float Luck => stats != null 
+        ? stats.GetFinalValue(StatType.Luck, 0f) 
+        : 0f;
+    
+    // Weapon stats
     public int MaxWeaponSlots => maxWeaponSlots;
-    public int BonusPierce => bonusPierce;
-    public int BonusProjectiles => bonusProjectiles;
-    public float AOEMultiplier => aoeMultiplier;
-    public float RangeMultiplier => rangeMultiplier;
-    public float ProjectileSizeMultiplier => projectileSizeMultiplier;
+    public int BonusPierce => bonusPierce + (int)stats?.GetFlatBonus(StatType.Pierce);
+    public int BonusProjectiles => bonusProjectiles + (int)stats?.GetFlatBonus(StatType.ProjectileCount);
+    public float AOEMultiplier => stats != null ? stats.GetFinalValue(StatType.AOE, 1f) : 1f;
+    public float RangeMultiplier => stats != null ? stats.GetFinalValue(StatType.Range, 1f) : 1f;
+    public float ProjectileSizeMultiplier => stats != null ? stats.GetFinalValue(StatType.ProjectileSize, 1f) : 1f;
     
+    // Statistics
     public int EnemiesKilled => enemiesKilled;
     public float DamageDealt => damageDealt;
     public float DamageTaken => damageTaken;
     
+    // Hero identity accessor
+    public HeroDefinition Hero => heroDefinition;
+    
     void Start()
     {
-        // Initialization is deferred until InitializeWithCharacter() is called by CharacterSelectionUI
+        // Initialization is deferred until InitializeWithHero() is called by CharacterSelectionUI
         // This allows character selection before game starts
     }
     
     /// <summary>
-    /// Initialize player with selected character data.
-    /// Called by CharacterSelectionUI after character selection.
+    /// Initialize player with selected hero.
+    /// Called by CharacterSelectionUI after hero selection.
     /// </summary>
-    public void InitializeWithCharacter(CharacterData character)
+    public void InitializeWithHero(HeroDefinition hero)
     {
         if (isInitialized)
         {
@@ -137,29 +125,24 @@ public class Player : MonoBehaviour, ICollidable
             return;
         }
         
-        characterData = character;
+        heroDefinition = hero;
         
-        // Apply base stats from character
-        moveSpeedMultiplier = character.moveSpeedModifier;
-        damageMultiplier = character.damageModifier;
-        attackSpeedMultiplier = character.attackSpeedModifier;
-        critChance = character.startingCritChance;
-        critDamage = character.critDamageModifier;
-        xpMagnetRange = character.xpMagnetRange;
-        pickupRadius = character.pickupRadius;
-        healthRegen = character.healthRegen;
+        // Initialize stat modifier system
+        stats = new HeroStats();
         
-        // Initialize health with character's base health
+        // NOTE: We don't copy stats - properties compute them on demand from heroDefinition + stats
+        
+        // Initialize health with hero's base health
         Health health = GetComponent<Health>();
         if (health == null)
             health = gameObject.AddComponent<Health>();
-        health.Initialize(character.baseMaxHealth);
+        health.Initialize(hero.baseMaxHealth);
         
-        // Update PlayerMovement with character's move speed
+        // Update PlayerMovement with hero's move speed
         PlayerMovement movement = GetComponent<PlayerMovement>();
         if (movement != null)
         {
-            movement.SetMoveSpeedModifier(character.moveSpeedModifier);
+            movement.SetMoveSpeedModifier(hero.baseMoveSpeed);
         }
         
         // Set up SpriteRenderer first
@@ -167,52 +150,33 @@ public class Player : MonoBehaviour, ICollidable
         if (sr == null)
             sr = gameObject.AddComponent<SpriteRenderer>();
         
-        sr.color = character.characterColor;
+        sr.color = hero.characterColor;
         sr.sortingOrder = 10; // Above ground and projectiles
         
-        // Set up DirectionalSpriteController (8-directional sprites)
-        directionController = GetComponent<DirectionalSpriteController>();
-        if (directionController == null)
-            directionController = gameObject.AddComponent<DirectionalSpriteController>();
-        
-        // Set entity type and let controller load sprites
-        DebugLog.Info($"[Player] Setting sprite type: '{character.spriteType}'");
-        directionController.SetEntityType(character.spriteType);
-        
-        // Set up AnimatedSpriteController for walking animation
+        // Set up AnimatedSpriteController for walking animation (replaces DirectionalSpriteController)
         AnimatedSpriteController animController = GetComponent<AnimatedSpriteController>();
         if (animController == null)
             animController = gameObject.AddComponent<AnimatedSpriteController>();
         
         // Use "Playerwizard" to match Heroes/wizard path structure
-        animController.SetEntityType("Player" + character.spriteType);
+        animController.SetEntityType("Player" + hero.spriteType);
         animController.SetAnimation("walking-8-frames");
         animController.LoadAllAnimations();
-        DebugLog.Info($"[Player] AnimatedSpriteController configured for Heroes/{character.spriteType}/walking-8-frames");
+        DebugLog.Info($"[Player] AnimatedSpriteController configured for Heroes/{hero.spriteType}/walking-8-frames");
         
-        // Scale adjustment: PixelLab wizard is 96×96@PPU32 = 3 units, procedural is 128×128@PPU128 = 1 unit
-        // To maintain similar visual size: scale by PPU ratio
-        float ppu = sr.sprite != null ? sr.sprite.pixelsPerUnit : 32f; // Default to 32 for PixelLab
-        float scaleMultiplier = ppu <= 32f ? 1.0f : 2.0f; // PixelLab sprites now at proper scale
-        transform.localScale = Vector3.one * scaleMultiplier * character.characterScale;
+        // IMPORTANT: Recalculate scale AFTER animated sprites are loaded to ensure correct PPU
+        // We need to wait a frame for the sprite to be properly assigned by AnimatedSpriteController
+        StartCoroutine(RecalculateScaleNextFrame(sr, hero.visualScale));
         
-        if (sr.sprite != null)
-        {
-            DebugLog.Info($"[Player] ✓ {character.characterName} sprite: {sr.sprite.name}, Size: {sr.sprite.texture.width}x{sr.sprite.texture.height}px, PPU={ppu}, Scale={scaleMultiplier}");
-            DebugLog.Info($"[Player] SpriteRenderer: enabled={sr.enabled}, color={sr.color}, sortingLayer={sr.sortingLayerName}, sortingOrder={sr.sortingOrder}");
-            DebugLog.Info($"[Player] GameObject: active={gameObject.activeSelf}, position={transform.position}, scale={transform.localScale}, layer={gameObject.layer}");
-        }
-        else
-        {
-            DebugLog.Error($"[Player] ✗ SpriteRenderer.sprite is NULL! Failed to load {character.spriteType}");
-        }
+        DebugLog.Info($"[Player] SpriteRenderer: enabled={sr.enabled}, color={sr.color}, sortingLayer={sr.sortingLayerName}, sortingOrder={sr.sortingOrder}");
+        DebugLog.Info($"[Player] GameObject: active={gameObject.activeSelf}, position={transform.position}, layer={gameObject.layer}");
         
         // Add starting weapon
         WeaponInventory weaponInventory = GetComponent<WeaponInventory>();
         if (weaponInventory == null)
             weaponInventory = gameObject.AddComponent<WeaponInventory>();
         
-        weaponInventory.AddWeapon(character.startingWeaponType);
+        weaponInventory.AddWeapon(hero.startingWeaponType);
         
         CalculateXPToNextLevel();
         levelUpUI = GameServices.LevelUpUI;
@@ -222,7 +186,39 @@ public class Player : MonoBehaviour, ICollidable
         
         isInitialized = true;
         
-        DebugLog.Info($"Player.InitializeWithCharacter: {character.characterName} ready! Level {currentLevel}, XP {currentXP}/{xpToNextLevel}");
+        DebugLog.Info($"Player.InitializeWithHero: {hero.displayName} ready! Level {currentLevel}, XP {currentXP}/{xpToNextLevel}");
+    }
+    
+    /// <summary>
+    /// Recalculate and apply scale after sprites are loaded.
+    /// Called as coroutine to ensure sprites are fully initialized.
+    /// </summary>
+    private System.Collections.IEnumerator RecalculateScaleNextFrame(SpriteRenderer sr, float visualScale)
+    {
+        yield return null; // Wait one frame for sprites to be assigned
+        
+        // Now calculate scale based on the ACTUAL loaded sprite
+        float ppu = sr.sprite != null ? sr.sprite.pixelsPerUnit : 32f;
+        
+        // PixelLab sprites: 96×96@PPU32 = 3 world units (too large)
+        // We want them to be ~1 world unit, so scale them down
+        // PPU 32 = scale 0.35x for ~1 world unit display
+        // PPU 128 = scale 1.0x for ~1 world unit display (procedural sprites)
+        float scaleMultiplier;
+        if (ppu <= 32f)
+        {
+            // PixelLab sprites - scale down to reasonable size
+            scaleMultiplier = 0.35f;
+        }
+        else
+        {
+            // High PPU sprites (procedural) - use 1.0x
+            scaleMultiplier = 1.0f;
+        }
+        
+        transform.localScale = Vector3.one * scaleMultiplier * visualScale;
+        
+        DebugLog.Info($"[Player] Scale recalculated: PPU={ppu:F0}, scale={scaleMultiplier:F2}x, final={transform.localScale.x:F2}");
     }
     
     /// <summary>
@@ -332,73 +328,89 @@ public class Player : MonoBehaviour, ICollidable
     }
     
     /// <summary>
-    /// Modify a stat (for upgrades/power-ups)
+    /// Modify a stat using the new HeroStats system (for upgrades/power-ups)
     /// </summary>
     public void ModifyStat(string statName, float value, bool isMultiplier = false)
     {
-        switch (statName.ToLower())
+        if (stats == null)
         {
-            case "damage":
-            case "damagemultiplier":
-                damageMultiplier = isMultiplier ? damageMultiplier * value : damageMultiplier + value;
-                break;
-            case "attackspeed":
-                attackSpeedMultiplier = isMultiplier ? attackSpeedMultiplier * value : attackSpeedMultiplier + value;
-                break;
-            case "movespeed":
-                moveSpeedMultiplier = isMultiplier ? moveSpeedMultiplier * value : moveSpeedMultiplier + value;
-                break;
-            case "critchance":
-                critChance = isMultiplier ? critChance * value : Mathf.Clamp01(critChance + value);
-                break;
-            case "critdamage":
-                critDamage = isMultiplier ? critDamage * value : critDamage + value;
-                break;
-            case "xprange":
-            case "magnetrange":
-                xpMagnetRange = isMultiplier ? xpMagnetRange * value : xpMagnetRange + value;
-                break;
-            case "luck":
-                luck = isMultiplier ? luck * value : luck + value;
-                break;
-            case "aoe":
-                aoeMultiplier = isMultiplier ? aoeMultiplier * value : aoeMultiplier + value;
-                break;
-            case "range":
-                rangeMultiplier = isMultiplier ? rangeMultiplier * value : rangeMultiplier + value;
-                break;
-            default:
-                DebugLog.Warning($"Player.ModifyStat: Unknown stat '{statName}'");
-                break;
+            DebugLog.Error("[Player] Cannot modify stat - HeroStats not initialized");
+            return;
         }
         
-        DebugLog.Info($"Player.ModifyStat: {statName} modified by {value} ({(isMultiplier ? "multiply" : "add")})");
+        StatType? statType = statName.ToLower() switch
+        {
+            "damage" or "damagemultiplier" => StatType.Damage,
+            "attackspeed" => StatType.AttackSpeed,
+            "movespeed" => StatType.MoveSpeed,
+            "critchance" => StatType.CritChance,
+            "critdamage" => StatType.CritDamage,
+            "xprange" or "magnetrange" => StatType.XPMagnetRange,
+            "luck" => StatType.Luck,
+            "aoe" => StatType.AOE,
+            "range" => StatType.Range,
+            "health" or "maxhealth" => StatType.MaxHealth,
+            "healthregen" => StatType.HealthRegen,
+            "damagereduction" => StatType.DamageReduction,
+            _ => null
+        };
+        
+        if (statType == null)
+        {
+            DebugLog.Warning($"[Player] Unknown stat '{statName}'");
+            return;
+        }
+        
+        if (isMultiplier)
+        {
+            // Convert multiplier to percent bonus (e.g., 1.2x = +0.2 = +20%)
+            stats.AddPercentBonus(statType.Value, value - 1f);
+        }
+        else
+        {
+            stats.AddFlatBonus(statType.Value, value);
+        }
+        
+        DebugLog.Info($"[Player] Modified {statName}: {(isMultiplier ? $"{value:F2}x" : $"+{value:F2}")}");
     }
     
     // ===== Stat Upgrade Methods (for UpgradeChoiceGenerator) =====
+    // These now use HeroStats for composable modifiers
     
     public void AddDamageMultiplier(float amount) 
     { 
-        damageMultiplier += amount;
-        DebugLog.Info($"[Player] Damage: {damageMultiplier:F2}x");
+        if (stats != null)
+        {
+            stats.AddPercentBonus(StatType.Damage, amount);
+            DebugLog.Info($"[Player] Damage: {DamageMultiplier:F2}x (+{amount * 100:F0}%)");
+        }
     }
     
     public void AddAttackSpeedMultiplier(float amount) 
     { 
-        attackSpeedMultiplier += amount;
-        DebugLog.Info($"[Player] Attack Speed: {attackSpeedMultiplier:F2}x");
+        if (stats != null)
+        {
+            stats.AddPercentBonus(StatType.AttackSpeed, amount);
+            DebugLog.Info($"[Player] Attack Speed: {AttackSpeedMultiplier:F2}x (+{amount * 100:F0}%)");
+        }
     }
     
     public void AddCritChance(float amount) 
     { 
-        critChance = Mathf.Clamp01(critChance + amount);
-        DebugLog.Info($"[Player] Crit Chance: {critChance * 100:F1}%");
+        if (stats != null)
+        {
+            stats.AddFlatBonus(StatType.CritChance, amount);
+            DebugLog.Info($"[Player] Crit Chance: {CritChance * 100:F1}% (+{amount * 100:F0}%)");
+        }
     }
     
     public void AddCritDamage(float amount) 
     { 
-        critDamage += amount;
-        DebugLog.Info($"[Player] Crit Damage: {critDamage:F2}x");
+        if (stats != null)
+        {
+            stats.AddFlatBonus(StatType.CritDamage, amount);
+            DebugLog.Info($"[Player] Crit Damage: {CritDamage:F2}x (+{amount:F2})");
+        }
     }
     
     public void AddMaxHealth(float amount)
@@ -407,32 +419,52 @@ public class Player : MonoBehaviour, ICollidable
         if (health != null)
         {
             health.IncreaseMaxHealth(amount);
-            DebugLog.Info($"[Player] Max Health: {health.MaxHealth}");
+            DebugLog.Info($"[Player] Max Health: {health.MaxHealth} (+{amount:F0})");
         }
     }
     
     public void AddHealthRegen(float amount) 
     { 
-        healthRegen += amount;
-        DebugLog.Info($"[Player] Health Regen: {healthRegen:F1}/s");
+        if (stats != null)
+        {
+            stats.AddFlatBonus(StatType.HealthRegen, amount);
+            DebugLog.Info($"[Player] Health Regen: {HealthRegen:F1}/s (+{amount:F1})");
+        }
     }
     
     public void AddMoveSpeedMultiplier(float amount) 
     { 
-        moveSpeedMultiplier += amount;
-        DebugLog.Info($"[Player] Move Speed: {moveSpeedMultiplier:F2}x");
+        if (stats != null)
+        {
+            stats.AddPercentBonus(StatType.MoveSpeed, amount);
+            DebugLog.Info($"[Player] Move Speed: {MoveSpeedMultiplier:F2}x (+{amount * 100:F0}%)");
+        }
     }
     
     public void AddPickupRadius(float multiplier) 
     { 
-        pickupRadius *= (1f + multiplier);
-        xpMagnetRange *= (1f + multiplier);
-        DebugLog.Info($"[Player] Pickup Radius: {pickupRadius:F1}, Magnet: {xpMagnetRange:F1}");
+        if (stats != null)
+        {
+            stats.AddPercentBonus(StatType.PickupRadius, multiplier);
+            stats.AddPercentBonus(StatType.XPMagnetRange, multiplier);
+            DebugLog.Info($"[Player] Pickup Radius: {PickupRadius:F1}, Magnet: {XPMagnetRange:F1} (+{multiplier * 100:F0}%)");
+        }
     }
     
     public void AddDamageReduction(float amount) 
     { 
-        damageReduction = Mathf.Clamp01(damageReduction + amount);
-        DebugLog.Info($"[Player] Damage Reduction: {damageReduction * 100:F1}%");
+        if (stats != null)
+        {
+            stats.AddFlatBonus(StatType.DamageReduction, amount);
+            DebugLog.Info($"[Player] Damage Reduction: {DamageReduction * 100:F1}% (+{amount * 100:F0}%)");
+        }
+    }
+    
+    /// <summary>
+    /// Get debug string of all active stat bonuses
+    /// </summary>
+    public string GetStatsDebugString()
+    {
+        return stats != null ? stats.GetDebugString() : "Stats not initialized";
     }
 }

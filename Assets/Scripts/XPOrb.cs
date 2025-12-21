@@ -10,7 +10,7 @@ public class XPOrb : MonoBehaviour
     private SpriteRenderer spriteRenderer;
     private int xpValue;
     private bool isActive;
-    private float moveSpeed = 5f;
+    private float baseMoveSpeed = 6f; // Base XP orb speed (slightly faster than default player speed)
     private float collectionRadius = 0.5f;
     
     void Awake()
@@ -48,7 +48,10 @@ public class XPOrb : MonoBehaviour
         // Move toward player if within magnet radius
         if (distance <= magnetRange)
         {
-            transform.position += toPlayer.normalized * moveSpeed * Time.deltaTime;
+            // Move slightly faster than player's current speed to ensure absorption
+            float playerSpeed = player != null ? player.MoveSpeedMultiplier * 5f : 5f; // 5f is base player speed
+            float effectiveSpeed = Mathf.Max(baseMoveSpeed, playerSpeed * 1.15f); // 15% faster than player
+            transform.position += toPlayer.normalized * effectiveSpeed * Time.deltaTime;
         }
     }
     

@@ -12,6 +12,10 @@ public class SpatialHashGrid
     private Dictionary<Vector2Int, List<ICollidable>> grid;
     private Vector2 gridOrigin;
     
+    // Pooled query result list (eliminates per-frame allocations)
+    // IMPORTANT: Callers must NOT store this reference - use immediately then discard
+    private static readonly List<ICollidable> sharedQueryResults = new List<ICollidable>(128);
+    
     // Statistics for profiling
     public int TotalCells => grid.Count;
     public int OccupiedCells { get; private set; }
@@ -77,21 +81,25 @@ public class SpatialHashGrid
     /// <summary>
     /// Query all entities near a position that match the layer mask.
     /// Checks the cell containing the position plus all adjacent cells (3x3 = 9 cells).
+    /// 
+    /// OPTIMIZATION: Returns a shared pooled list to eliminate GC allocations.
+    /// IMPORTANT: Caller must use the results immediately and NOT store the returned list reference.
+    /// The list contents will be overwritten on the next Query() call.
     /// </summary>
     /// <param name="position">World position to query around</param>
     /// <param name="radius">Query radius (determines how many cells to check)</param>
     /// <param name="mask">Layer mask to filter results</param>
-    /// <returns>List of entities in nearby cells matching the layer mask</returns>
+    /// <returns>Shared pooled list of entities (DO NOT STORE - use immediately)</returns>
     public List<ICollidable> Query(Vector3 position, float radius, CollisionLayer mask)
     {
+        // Clear shared results from previous query (zero allocation)
+        sharedQueryResults.Clear();
+        
         Vector2Int centerCell = GetCellCoords(position);
         
         // Calculate how many cells the radius spans
         // For radius 0.5 and cellSize 2.0: cellRadius = 1 (check 3x3 cells)
         int cellRadius = Mathf.CeilToInt(radius / cellSize);
-        
-        // Pre-allocate result list (typical: 20-50 entities in 9 cells)
-        var results = new List<ICollidable>(32);
         
         // Check all cells within radius
         for (int x = -cellRadius; x <= cellRadius; x++)
@@ -102,19 +110,19 @@ public class SpatialHashGrid
                 
                 if (grid.TryGetValue(cell, out var list))
                 {
-                    // Filter by layer mask
+                    // Filter by layer mask and add to shared results
                     foreach (var entity in list)
                     {
                         if (entity != null && entity.IsActive && (entity.Layer & mask) != 0)
                         {
-                            results.Add(entity);
+                            sharedQueryResults.Add(entity);
                         }
                     }
                 }
             }
         }
         
-        return results;
+        return sharedQueryResults;
     }
     
     /// <summary>

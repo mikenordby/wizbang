@@ -133,9 +133,9 @@ public class LaserWeapon : Weapon
     {
         GameObject beamObj = new GameObject($"LaserBeam_{shotID}");
         
-        // Add cleanup component to remove hit tracking when beam is destroyed
-        var cleanup = beamObj.AddComponent<LaserCleanup>();
-        cleanup.Initialize(this, shotID, beamDuration);
+        // Schedule beam cleanup and remove hit tracking after duration
+        Destroy(beamObj, beamDuration);
+        StartCoroutine(CleanupShotAfterDelay(shotID, beamDuration));
         
         LineRenderer line = beamObj.AddComponent<LineRenderer>();
         
@@ -165,15 +165,14 @@ public class LaserWeapon : Weapon
         
         glow.SetPosition(0, origin);
         glow.SetPosition(1, origin + direction * laserLength);
-        
-        Destroy(beamObj, beamDuration);
     }
     
     /// <summary>
-    /// Called by LaserCleanup when beam is destroyed
+    /// Cleanup shot hit tracking after beam expires
     /// </summary>
-    public void CleanupShot(int shotID)
+    private System.Collections.IEnumerator CleanupShotAfterDelay(int shotID, float delay)
     {
+        yield return new WaitForSeconds(delay);
         shotHitTracking.Remove(shotID);
     }
     

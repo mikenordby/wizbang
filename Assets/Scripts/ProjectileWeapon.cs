@@ -4,9 +4,9 @@ using System.Collections.Generic;
 /// <summary>
 /// Auto-aim projectile weapon that shoots at nearest enemy.
 /// Inherits fire rate and damage from Weapon base class.
-/// Implements IWeaponCollisionHandler for self-managed collision detection.
+/// Collision detection is now handled centrally by CollisionManager.ProcessProjectileCollisions()
 /// </summary>
-public class ProjectileWeapon : Weapon, IWeaponCollisionHandler
+public class ProjectileWeapon : Weapon
 {
     private ProjectilePool projectilePool;
     private EnemyPool enemyPool;
@@ -30,17 +30,8 @@ public class ProjectileWeapon : Weapon, IWeaponCollisionHandler
         if (enemyPool == null)
             DebugLog.Warning("[ProjectileWeapon] EnemyPool not found");
         
-        // Auto-register with CollisionManager
-        CollisionManager collisionMgr = FindAnyObjectByType<CollisionManager>();
-        if (collisionMgr != null)
-        {
-            collisionMgr.RegisterWeapon(this);
-            DebugLog.Info($"[ProjectileWeapon] Auto-registered with CollisionManager");
-        }
-        else
-        {
-            DebugLog.Error("[ProjectileWeapon] CollisionManager not found - collisions will NOT work!");
-        }
+        // NOTE: No longer registers with CollisionManager - collision detection is now centralized
+        DebugLog.Info("[ProjectileWeapon] Using centralized collision detection");
     }
     
     protected override void Fire()
@@ -110,115 +101,7 @@ public class ProjectileWeapon : Weapon, IWeaponCollisionHandler
         return nearest;
     }
     
-    #region IWeaponCollisionHandler Implementation
-    
-    /// <summary>
-    /// Check collisions for projectiles from this weapon.
-    /// Note: All ProjectileWeapon and RapidFireWeapon share the same pool,
-    /// so we check ALL projectiles, not just ones from this specific weapon.
-    /// </summary>
-    public void CheckCollisions(SpatialHashGrid grid, EnemyPool enemyPool)
-    {
-        if (grid == null || enemyPool == null)
-        {
-            DebugLog.Warning("[ProjectileWeapon] CheckCollisions called with null grid or enemyPool");
-            return;
-        }
-        if (projectilePool == null)
-        {
-            DebugLog.Warning("[ProjectileWeapon] CheckCollisions: projectilePool is null");
-            return;
-        }
-        
-        // Get all active projectiles (shared pool)
-        List<Projectile> activeProjectiles = new List<Projectile>(projectilePool.GetActiveProjectiles());
-        
-        if (Time.frameCount % 120 == 0)
-        {
-            DebugLog.Verbose($"[ProjectileWeapon.CheckCollisions] Active projectiles: {activeProjectiles.Count}");
-        }
-        
-        int projectilesChecked = 0;
-        int totalNearbyEnemies = 0;
-        int totalHits = 0;
-        
-        foreach (var projectile in activeProjectiles)
-        {
-            projectilesChecked++;
-            
-            // Query spatial grid for nearby enemies
-            var nearbyEntities = grid.Query(
-                projectile.Position,
-                projectile.CollisionRadius,
-                CollisionLayer.Enemy
-            );
-            
-            totalNearbyEnemies += nearbyEntities.Count;
-            
-            foreach (var entity in nearbyEntities)
-            {
-                if (entity is Enemy enemy && enemy.gameObject.activeInHierarchy)
-                {
-                    float distance = UnityEngine.Vector3.Distance(projectile.Position, enemy.Position);
-                    float combinedRadius = projectile.CollisionRadius + enemy.CollisionRadius;
-                    
-                    if (distance < combinedRadius)
-                    {
-                        int enemyID = enemy.gameObject.GetInstanceID();
-                        if (projectile.RegisterHit(enemyID))
-                        {
-                            totalHits++;
-                            Health enemyHealth = enemy.GetComponent<Health>();
-                            if (enemyHealth != null)
-                            {
-                                DamageContext context = new DamageContext
-                                {
-                                    baseDamage = projectile.Damage,
-                                    player = GameServices.Player,
-                                    enemy = enemy,
-                                    damageType = projectile.DamageType
-                                };
-                                
-                                DamageResult result = DamageCalculator.Instance.CalculateDamage(context);
-                                bool died = enemyHealth.TakeDamage(result.finalDamage);
-
-                                DebugLog.Verbose($"[ProjectileWeapon] HIT! {enemy.name}: {result.finalDamage} damage, died={died}, pierce={projectile.EnemiesHit}/{projectile.Pierce}");
-                                
-                                DamageNumberPool damagePool = GameServices.DamageNumberPool;
-                                if (damagePool != null)
-                                {
-                                    if (result.isCritical)
-                                        damagePool.ShowCriticalDamage(enemy.Position, result.finalDamage);
-                                    else
-                                        damagePool.ShowDamage(enemy.Position, result.finalDamage);
-                                }
-                            }
-                            
-                            // Deactivate if exceeded pierce limit
-                            if (projectile.EnemiesHit >= projectile.Pierce)
-                            {
-                                projectile.Deactivate();
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-        }        
-        if (Time.frameCount % 120 == 0)
-        {
-            DebugLog.Verbose($"[ProjectileWeapon.CheckCollisions] Summary: checked={projectilesChecked}, nearbyEnemies={totalNearbyEnemies}, hits={totalHits}");
-        }        
-        if (Time.frameCount % 120 == 0)
-        {
-            DebugLog.Verbose($"[ProjectileWeapon.CheckCollisions] Summary: checked={projectilesChecked}, nearbyEnemies={totalNearbyEnemies}, hits={totalHits}");
-        }
-    }
-    
-    /// <summary>
-    /// Whether this weapon is active and should check collisions
-    /// </summary>
-    bool IWeaponCollisionHandler.IsActive => gameObject.activeInHierarchy && enabled;
-    
-    #endregion
+    // NOTE: No longer implements IWeaponCollisionHandler
+    // Collision detection for projectiles is now centralized in CollisionManager.ProcessProjectileCollisions()
+    // This eliminates ~80 lines of duplicated code that was in every projectile weapon
 }

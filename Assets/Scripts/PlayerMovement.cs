@@ -15,7 +15,6 @@ public class PlayerMovement : MonoBehaviour
     private Rigidbody2D rb;
     private Vector2 moveInput;
     private Player player;
-    private DirectionalSpriteController directionController;
     private AnimatedSpriteController animController;
     
     // Position logging
@@ -26,9 +25,6 @@ private void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
         player = GetComponent<Player>();
-        directionController = GetComponent<DirectionalSpriteController>();
-        
-        DebugLog.Info($"[PlayerMovement] Awake: directionController {(directionController != null ? "FOUND" : "NULL")}");
         
         // Create a simple white square sprite if none exists
         SpriteRenderer sr = GetComponent<SpriteRenderer>();
@@ -96,7 +92,7 @@ private void Update()
             animController = GetComponent<AnimatedSpriteController>();
         }
         
-        // Use animated sprite controller if available, otherwise fall back to static directional sprites
+        // Use animated sprite controller for directional animation
         if (animController != null && animController.IsInitialized)
         {
             if (moveInput != Vector2.zero)
@@ -112,19 +108,6 @@ private void Update()
                 // Stopped moving - pause animation on first frame
                 if (animController.IsPlaying)
                     animController.Stop();
-            }
-        }
-        else
-        {
-            // Fallback to static directional sprites
-            if (directionController == null)
-            {
-                directionController = GetComponent<DirectionalSpriteController>();
-            }
-            
-            if (moveInput != Vector2.zero && directionController != null)
-            {
-                directionController.UpdateDirection(moveInput);
             }
         }
     }

@@ -1,0 +1,33 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 08d68bf7d633fb14882c9ee20f1d2cd7, type: 3}
+  m_Name: Knight
+  m_EditorClassIdentifier: 
+  heroId: knight
+  displayName: Knight
+  description: Heavily armored warrior with bonus health and orbiting blade. Starts with 2 orbiters for close-range defense.
+  startingWeaponType: OrbiterWeapon
+  baseMaxHealth: 150
+  baseMoveSpeed: 0.85
+  baseDamage: 1.2
+  baseAttackSpeed: 0.9
+  baseCritChance: 0.02
+  baseCritDamage: 2
+  baseXPMagnetRange: 1.5
+  basePickupRadius: 0.5
+  baseHealthRegen: 1
+  characterColor: {r: 0.8, g: 0.8, b: 0.9, a: 1}
+  visualScale: 1
+  spriteType: knight
+  passiveAbilityId: 
+  startingPerkId: 
+

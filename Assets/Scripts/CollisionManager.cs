@@ -81,6 +81,25 @@ public class CollisionManager : MonoBehaviour
         spatialGrid = new SpatialHashGrid(gridCellSize);
         DebugLog.Info($"[CollisionManager] Initialized spatial hash grid with cell size {gridCellSize}", "Collision");
         
+        // Validate pool references
+        if (projectilePool == null)
+        {
+            DebugLog.Error("[CollisionManager] ProjectilePool not assigned! Collision detection will not work.", "Collision");
+        }
+        else
+        {
+            DebugLog.Info("[CollisionManager] ProjectilePool reference found", "Collision");
+        }
+        
+        if (enemyPool == null)
+        {
+            DebugLog.Error("[CollisionManager] EnemyPool not assigned! Collision detection will not work.", "Collision");
+        }
+        else
+        {
+            DebugLog.Info("[CollisionManager] EnemyPool reference found", "Collision");
+        }
+        
         // Auto-find OrbiterManager if not assigned
         if (orbiterManager == null)
         {
@@ -101,28 +120,17 @@ public class CollisionManager : MonoBehaviour
                 RegisterWeapon(boomerangWeapon);
             }
             
-            // Register OrbiterWeapon
+            // Register OrbiterWeapon (still uses IWeaponCollisionHandler)
             OrbiterWeapon orbiterWeapon = playerTransform.GetComponent<OrbiterWeapon>();
             if (orbiterWeapon != null)
             {
                 RegisterWeapon(orbiterWeapon);
             }
             
-            // Register ProjectileWeapon (handles shared projectile pool)
-            ProjectileWeapon projectileWeapon = playerTransform.GetComponent<ProjectileWeapon>();
-            if (projectileWeapon != null)
-            {
-                RegisterWeapon(projectileWeapon);
-            }
+            // NOTE: ProjectileWeapon and RapidFireWeapon no longer register here
+            // They now use centralized collision detection via ProcessProjectileCollisions()
             
-            // Register RapidFireWeapon (shares pool, but registration is needed for consistency)
-            RapidFireWeapon rapidFireWeapon = playerTransform.GetComponent<RapidFireWeapon>();
-            if (rapidFireWeapon != null)
-            {
-                RegisterWeapon(rapidFireWeapon);
-            }
-            
-            DebugLog.Info($"[CollisionManager] Registered {registeredWeapons.Count} weapons for collision detection", "Collision");
+            DebugLog.Info($"[CollisionManager] Registered {registeredWeapons.Count} IWeaponCollisionHandler weapons (orbiters, boomerangs, etc.)", "Collision");
         }
         
         DebugLog.Verbose($"[CollisionManager] Starting - orbiterManager={orbiterManager != null}, enemyPool={enemyPool != null}, projectilePool={projectilePool != null}");
@@ -178,29 +186,18 @@ public class CollisionManager : MonoBehaviour
         }
         
         // Dynamic weapon registration (catches weapons added after Start)
-        if (playerTransform != null && registeredWeapons.Count == 0)
-        {
-            ProjectileWeapon projectileWeapon = playerTransform.GetComponent<ProjectileWeapon>();
-            if (projectileWeapon != null)
-            {
-                RegisterWeapon(projectileWeapon);
-                DebugLog.Info("[CollisionManager] Late-registered ProjectileWeapon in Update", "Collision");
-            }
-            else
-            {
-                DebugLog.Warning("[CollisionManager] No ProjectileWeapon found on player!");
-            }
-        }
+        // NOTE: ProjectileWeapon no longer needs registration - centralized collision in ProcessProjectileCollisions()
+        // Only register weapons that still implement IWeaponCollisionHandler (boomerangs, orbiters, etc.)
         
         // Populate spatial hash grid with all entities
         PopulateSpatialGrid();
         
         // Perform collision checks using grid
-        // Check collisions for all registered weapons (new pattern - replaces old hard-coded methods)
-        if (Time.frameCount % 120 == 0 && registeredWeapons.Count > 0)
-        {
-            DebugLog.Verbose($"[CollisionManager] About to CheckRegisteredWeaponCollisions, count={registeredWeapons.Count}");
-        }
+        // NEW: Centralized projectile collision processing (eliminates duplication)
+        ProcessProjectileCollisions();
+        
+        // LEGACY: Check collisions for registered weapons (orbiters, boomerangs, etc.)
+        // Standard projectiles now use ProcessProjectileCollisions() above
         CheckRegisteredWeaponCollisions();
         
         // Player collision still handled by CollisionManager (not weapon-specific)
@@ -234,20 +231,133 @@ public class CollisionManager : MonoBehaviour
 
     
     /// <summary>
+    /// Centralized projectile collision processor - eliminates code duplication across weapons.
+    /// Handles collision detection for all projectiles from the ProjectilePool.
+    /// </summary>
+    private void ProcessProjectileCollisions()
+    {
+        if (projectilePool == null)
+        {
+            if (Time.frameCount % 60 == 0)
+                DebugLog.Warning("[CollisionManager] ProjectilePool is null! Collision detection disabled.");
+            return;
+        }
+        
+        if (enemyPool == null)
+        {
+            if (Time.frameCount % 60 == 0)
+                DebugLog.Warning("[CollisionManager] EnemyPool is null! Collision detection disabled.");
+            return;
+        }
+        
+        if (spatialGrid == null)
+        {
+            if (Time.frameCount % 60 == 0)
+                DebugLog.Warning("[CollisionManager] SpatialGrid is null! Collision detection disabled.");
+            return;
+        }
+        
+        // Get all active projectiles from the shared pool
+        List<Projectile> activeProjectiles = projectilePool.GetActiveProjectiles();
+        
+        if (activeProjectiles == null)
+        {
+            if (Time.frameCount % 60 == 0)
+                DebugLog.Warning("[CollisionManager] GetActiveProjectiles returned null!");
+            return;
+        }
+        
+        if (Time.frameCount % 120 == 0 && activeProjectiles.Count > 0)
+        {
+            DebugLog.Info($"[CollisionManager] Processing {activeProjectiles.Count} active projectiles");
+        }
+        
+        int totalHits = 0;
+        
+        // Iterate backwards to safely handle projectiles being deactivated mid-loop
+        for (int i = activeProjectiles.Count - 1; i >= 0; i--)
+        {
+            var projectile = activeProjectiles[i];
+            if (projectile == null || !projectile.IsActive) continue;
+            
+            // Query spatial grid for nearby enemies
+            var nearbyEntities = spatialGrid.Query(
+                projectile.Position,
+                projectile.CollisionRadius,
+                CollisionLayer.Enemy
+            );
+            
+            foreach (var entity in nearbyEntities)
+            {
+                if (entity is Enemy enemy && enemy.gameObject.activeInHierarchy)
+                {
+                    float distance = UnityEngine.Vector3.Distance(projectile.Position, enemy.Position);
+                    float combinedRadius = projectile.CollisionRadius + enemy.CollisionRadius;
+                    
+                    if (distance < combinedRadius)
+                    {
+                        int enemyID = enemy.gameObject.GetInstanceID();
+                        
+                        // Register hit on projectile (handles pierce logic)
+                        if (projectile.RegisterHit(enemyID))
+                        {
+                            totalHits++;
+                            
+                            // Apply damage
+                            Health enemyHealth = enemy.GetComponent<Health>();
+                            if (enemyHealth != null)
+                            {
+                                DamageContext context = new DamageContext
+                                {
+                                    baseDamage = projectile.Damage,
+                                    player = GameServices.Player,
+                                    enemy = enemy,
+                                    damageType = projectile.DamageType
+                                };
+                                
+                                DamageResult result = DamageCalculator.Instance.CalculateDamage(context);
+                                bool died = enemyHealth.TakeDamage(result.finalDamage);
+                                
+                                DebugLog.Verbose($"[CollisionManager] Projectile hit {enemy.name}: {result.finalDamage:F1} damage, died={died}");
+                                
+                                // Show damage number
+                                DamageNumberPool damagePool = GameServices.DamageNumberPool;
+                                if (damagePool != null)
+                                {
+                                    if (result.isCritical)
+                                        damagePool.ShowCriticalDamage(enemy.Position, result.finalDamage);
+                                    else
+                                        damagePool.ShowDamage(enemy.Position, result.finalDamage);
+                                }
+                            }
+                            
+                            // Deactivate if exceeded pierce limit
+                            if (projectile.EnemiesHit > projectile.Pierce)
+                            {
+                                projectile.Deactivate();
+                                break; // Move to next projectile
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        if (Time.frameCount % 120 == 0 && totalHits > 0)
+        {
+            DebugLog.Verbose($"[CollisionManager] Projectile collisions: {totalHits} hits");
+        }
+    }
+    
+    /// <summary>
     /// Check collisions for all registered weapons using their own logic.
-    /// This is the new pattern - weapons handle their own collision detection.
+    /// LEGACY: Kept for weapons that don't use the standard projectile pool (orbiters, boomerangs, etc.)
+    /// Most weapons now use centralized collision via ProcessProjectileCollisions().
     /// </summary>
     private void CheckRegisteredWeaponCollisions()
     {
-        if (registeredWeapons.Count == 0)
-        {
-            // Only warn once per second to avoid spam
-            if (Time.frameCount % 60 == 0)
-            {
-                DebugLog.Warning("[CollisionManager] No weapons registered for collision detection!");
-            }
-            return;
-        }
+        // No warning needed - it's normal to have 0 registered weapons if only using projectile-based weapons
+        if (registeredWeapons.Count == 0) return;
         
         foreach (var weapon in registeredWeapons)
         {

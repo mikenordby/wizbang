@@ -46,7 +46,8 @@ public enum PlayerStatType
     HealthRegen,
     MoveSpeed,
     PickupRadius,
-    DamageReduction
+    DamageReduction,
+    Lifesteal
 }
 
 /// <summary>
@@ -105,7 +106,8 @@ public class UpgradeChoiceGenerator : MonoBehaviour
         { PlayerStatType.HealthRegen, ("Regeneration", "+1 health per second", 1f) },
         { PlayerStatType.MoveSpeed, ("Swiftness", "+10% movement speed", 0.1f) },
         { PlayerStatType.PickupRadius, ("Magnet", "+50% pickup radius", 0.5f) },
-        { PlayerStatType.DamageReduction, ("Armor", "+5% damage reduction", 0.05f) }
+        { PlayerStatType.DamageReduction, ("Armor", "+5% damage reduction", 0.05f) },
+        { PlayerStatType.Lifesteal, ("Lifesteal", "5% chance to heal 1 HP on hit", 0.05f) }
     };
     
     private void Awake()
@@ -315,6 +317,9 @@ public class UpgradeChoiceGenerator : MonoBehaviour
                 break;
             case PlayerStatType.DamageReduction:
                 player.AddDamageReduction(value);
+                break;
+            case PlayerStatType.Lifesteal:
+                player.AddLifestealChance(value);
                 break;
         }
     }

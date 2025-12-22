@@ -93,7 +93,7 @@ public class LevelUpUI : MonoBehaviour
             DebugLog.Warning("[LevelUpUI] For better visuals, create a prefab and assign it in the Inspector.");
         }
         
-        float[] buttonXPositions = { -360f, 0f, 360f };  // Wider spacing for larger cards
+        float[] buttonXPositions = { -450f, 0f, 450f };  // Wide spacing for large cards
         for (int i = 0; i < 3; i++)
         {
             GameObject optionGO;

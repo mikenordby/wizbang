@@ -8,6 +8,7 @@ public class GameManager : MonoBehaviour
 {
     private CollisionManager collisionManager;
     private MainMenuUI mainMenu;
+    private ItemInventoryHUD itemHUD;
     
     private void Start()
     {
@@ -45,6 +46,13 @@ public class GameManager : MonoBehaviour
             case GamePhase.Gameplay:
                 // Game is starting - all systems should be ready
                 DebugLog.Info("[GameManager] Gameplay phase started - all systems active");
+                
+                // Create item inventory HUD if it doesn't exist
+                if (itemHUD == null)
+                {
+                    GameObject hudObj = new GameObject("ItemInventoryHUD");
+                    itemHUD = hudObj.AddComponent<ItemInventoryHUD>();
+                }
                 break;
         }
     }

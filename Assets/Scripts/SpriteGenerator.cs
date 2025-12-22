@@ -1351,5 +1351,85 @@ public static class SpriteGenerator
             }
         }
     }
+    
+    /// <summary>
+    /// Create an item sprite with rarity-based appearance (gem/crystal shape)
+    /// </summary>
+    public static Sprite CreateItemSprite(ItemRarity rarity)
+    {
+        Color rarityColor = ItemRarityUtils.GetColor(rarity);
+        return GetOrCreateSprite($"item_{rarity}", rarityColor, () => CreateItemSpriteInternal(rarityColor, rarity));
+    }
+    
+    private static Sprite CreateItemSpriteInternal(Color baseColor, ItemRarity rarity)
+    {
+        int size = 64;
+        var (texture, pixels) = CreateProceduralTexture(size);
+        
+        // Create a gem/crystal shape
+        int centerX = size / 2;
+        int centerY = size / 2;
+        
+        // Colors
+        Color darkColor = new Color(baseColor.r * 0.4f, baseColor.g * 0.4f, baseColor.b * 0.4f);
+        Color lightColor = new Color(
+            Mathf.Min(1f, baseColor.r * 1.3f), 
+            Mathf.Min(1f, baseColor.g * 1.3f), 
+            Mathf.Min(1f, baseColor.b * 1.3f)
+        );
+        Color shimmerColor = new Color(1f, 1f, 1f, 0.8f);
+        
+        // Draw gem shape (hexagonal)
+        int gemRadius = size / 3;
+        
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                float dx = x - centerX;
+                float dy = y - centerY;
+                
+                // Hexagonal check
+                float ax = Mathf.Abs(dx);
+                float ay = Mathf.Abs(dy);
+                
+                // Hexagon formula: 2*ax + ay < radius * 1.5
+                if (ax * 2 + ay < gemRadius * 1.8f && ay < gemRadius * 0.9f)
+                {
+                    // Inside the gem
+                    int flippedY = size - 1 - y;
+                    int idx = flippedY * size + x;
+                    
+                    // Gradient based on position
+                    float brightness = 0.5f + (dy / gemRadius) * 0.3f + (dx / gemRadius) * 0.2f;
+                    brightness = Mathf.Clamp01(brightness);
+                    
+                    Color pixelColor = Color.Lerp(darkColor, lightColor, brightness);
+                    pixels[idx] = pixelColor;
+                    
+                    // Add shimmer highlight near top-left
+                    if (dx < -gemRadius * 0.2f && dy < -gemRadius * 0.3f && ax * 2 + ay < gemRadius * 1.2f)
+                    {
+                        pixels[idx] = Color.Lerp(pixelColor, shimmerColor, 0.5f);
+                    }
+                }
+            }
+        }
+        
+        // Add outline
+        AddOutline(pixels, size, Color.black);
+        
+        // Higher rarity = higher PPU (smaller on screen but more detailed)
+        float ppu = rarity switch
+        {
+            ItemRarity.Supreme => 48f,
+            ItemRarity.Legendary => 44f,
+            ItemRarity.Exotic => 40f,
+            ItemRarity.Rare => 36f,
+            _ => 32f
+        };
+        
+        return FinalizeSprite(texture, pixels, size, ppu);
+    }
 }
 

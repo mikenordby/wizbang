@@ -123,6 +123,12 @@ public static class GameEvents
     /// </summary>
     public static event Action<string, float> OnPowerupCollected;
     
+    /// <summary>
+    /// Fired when player collects an item from the item system.
+    /// Listeners: UI (inventory display), audio, achievements
+    /// </summary>
+    public static event Action<ItemDefinition> OnItemCollected;
+    
     // ===== TRIGGER METHODS =====
     // These should be called by the systems that generate the events
     
@@ -206,6 +212,11 @@ public static class GameEvents
         OnPowerupCollected?.Invoke(powerupName, duration);
     }
     
+    public static void TriggerItemCollected(ItemDefinition item)
+    {
+        OnItemCollected?.Invoke(item);
+    }
+    
     /// <summary>
     /// Clear all event subscriptions (call on scene unload to prevent memory leaks)
     /// </summary>
@@ -227,5 +238,6 @@ public static class GameEvents
         OnGameRestart = null;
         OnItemPickup = null;
         OnPowerupCollected = null;
+        OnItemCollected = null;
     }
 }

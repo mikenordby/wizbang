@@ -320,6 +320,18 @@ public class CollisionManager : MonoBehaviour
                                 
                                 DebugLog.Verbose($"[CollisionManager] Projectile hit {enemy.name}: {result.finalDamage:F1} damage, died={died}");
                                 
+                                // Lifesteal healing (chance to heal 1 HP on hit)
+                                Player player = GameServices.Player;
+                                if (player != null && player.LifestealChance > 0f && Random.value < player.LifestealChance)
+                                {
+                                    Health playerHealth = player.GetComponent<Health>();
+                                    if (playerHealth != null && playerHealth.CurrentHealth < playerHealth.MaxHealth)
+                                    {
+                                        playerHealth.Heal(1f);
+                                        DebugLog.Info($"[CollisionManager] 💚 Lifesteal! Healed 1 HP (chance={player.LifestealChance*100:F0}%)");
+                                    }
+                                }
+                                
                                 // Show damage number
                                 DamageNumberPool damagePool = GameServices.DamageNumberPool;
                                 if (damagePool != null)

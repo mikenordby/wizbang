@@ -91,6 +91,10 @@ public class Player : MonoBehaviour, ICollidable
         ? stats.GetFinalValue(StatType.Luck, 0f) 
         : 0f;
     
+    public float LifestealChance => stats != null 
+        ? stats.GetFinalValue(StatType.Lifesteal, 0f) 
+        : 0f;
+    
     // Weapon stats
     public int MaxWeaponSlots => maxWeaponSlots;
     public int BonusPierce => bonusPierce + (int)stats?.GetFlatBonus(StatType.Pierce);
@@ -132,11 +136,12 @@ public class Player : MonoBehaviour, ICollidable
         
         // NOTE: We don't copy stats - properties compute them on demand from heroDefinition + stats
         
-        // Initialize health with hero's base health
+        // Initialize health with hero's base health and regen
         Health health = GetComponent<Health>();
         if (health == null)
             health = gameObject.AddComponent<Health>();
         health.Initialize(hero.baseMaxHealth);
+        health.SetRegenRate(hero.baseHealthRegen);
         
         // Update PlayerMovement with hero's move speed
         PlayerMovement movement = GetComponent<PlayerMovement>();
@@ -178,6 +183,11 @@ public class Player : MonoBehaviour, ICollidable
         
         weaponInventory.AddWeapon(hero.startingWeaponType);
         
+        // Add item inventory for collecting items
+        PlayerInventory itemInventory = GetComponent<PlayerInventory>();
+        if (itemInventory == null)
+            itemInventory = gameObject.AddComponent<PlayerInventory>();
+        
         CalculateXPToNextLevel();
         levelUpUI = GameServices.LevelUpUI;
         
@@ -195,30 +205,21 @@ public class Player : MonoBehaviour, ICollidable
     /// </summary>
     private System.Collections.IEnumerator RecalculateScaleNextFrame(SpriteRenderer sr, float visualScale)
     {
-        yield return null; // Wait one frame for sprites to be assigned
+        // Wait for AnimatedSpriteController to fully load and set the sprite
+        yield return new WaitForSeconds(0.1f); // Give more time for animation frames to load
         
         // Now calculate scale based on the ACTUAL loaded sprite
         float ppu = sr.sprite != null ? sr.sprite.pixelsPerUnit : 32f;
         
-        // PixelLab sprites: 96×96@PPU32 = 3 world units (too large)
-        // We want them to be ~1 world unit, so scale them down
-        // PPU 32 = scale 0.35x for ~1 world unit display
-        // PPU 128 = scale 1.0x for ~1 world unit display (procedural sprites)
-        float scaleMultiplier;
-        if (ppu <= 32f)
-        {
-            // PixelLab sprites - scale down to reasonable size
-            scaleMultiplier = 0.35f;
-        }
-        else
-        {
-            // High PPU sprites (procedural) - use 1.0x
-            scaleMultiplier = 1.0f;
-        }
+        DebugLog.Info($"[Player] Sprite PPU detected: {ppu}, sprite={(sr.sprite != null ? sr.sprite.name : "null")}");
+        
+        // Force larger scale for wizard - AnimatedSpriteController frames are at PPU=100
+        // We want the wizard to be visibly larger on screen
+        float scaleMultiplier = 2.0f; // Make wizard 2x larger than default
         
         transform.localScale = Vector3.one * scaleMultiplier * visualScale;
         
-        DebugLog.Info($"[Player] Scale recalculated: PPU={ppu:F0}, scale={scaleMultiplier:F2}x, final={transform.localScale.x:F2}");
+        DebugLog.Info($"[Player] Scale applied: scaleMultiplier={scaleMultiplier:F2}x, visualScale={visualScale:F2}, final={transform.localScale.x:F2}");
     }
     
     /// <summary>
@@ -428,6 +429,14 @@ public class Player : MonoBehaviour, ICollidable
         if (stats != null)
         {
             stats.AddFlatBonus(StatType.HealthRegen, amount);
+            
+            // Update the Health component's regen rate
+            var health = GetComponent<Health>();
+            if (health != null)
+            {
+                health.AddRegenRate(amount);
+            }
+            
             DebugLog.Info($"[Player] Health Regen: {HealthRegen:F1}/s (+{amount:F1})");
         }
     }
@@ -457,6 +466,15 @@ public class Player : MonoBehaviour, ICollidable
         {
             stats.AddFlatBonus(StatType.DamageReduction, amount);
             DebugLog.Info($"[Player] Damage Reduction: {DamageReduction * 100:F1}% (+{amount * 100:F0}%)");
+        }
+    }
+    
+    public void AddLifestealChance(float amount) 
+    { 
+        if (stats != null)
+        {
+            stats.AddFlatBonus(StatType.Lifesteal, amount);
+            DebugLog.Info($"[Player] Lifesteal Chance: {LifestealChance * 100:F1}% (+{amount * 100:F0}%)");
         }
     }
     

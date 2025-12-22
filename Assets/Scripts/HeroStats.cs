@@ -21,7 +21,8 @@ public enum StatType
     ProjectileCount,
     Range,
     ProjectileSize,
-    AOE
+    AOE,
+    Lifesteal
 }
 
 /// <summary>
@@ -116,8 +117,8 @@ public class HeroStats
         float final = (baseValue + flat) * (1f + percent);
         
         // Special clamping for certain stats
-        if (stat == StatType.CritChance)
-            final = Mathf.Clamp01(final); // Cap crit chance at 100%
+        if (stat == StatType.CritChance || stat == StatType.Lifesteal)
+            final = Mathf.Clamp01(final); // Cap crit chance and lifesteal at 100%
         else if (stat == StatType.DamageReduction)
             final = Mathf.Clamp(final, 0f, 0.9f); // Cap damage reduction at 90%
         else if (stat == StatType.MoveSpeed || stat == StatType.AttackSpeed)

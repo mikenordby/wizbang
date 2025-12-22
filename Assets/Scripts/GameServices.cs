@@ -34,9 +34,11 @@ public class GameServices : MonoBehaviour
     private CollisionManager collisionManager;
     private OrbiterManager orbiterManager;
     private LevelUpUI levelUpUI;
+    private TreasureUI treasureUI;
     private DamageNumberPool damageNumberPool;
     private Player player;
     private DamageCalculator damageCalculator;
+    private ItemDatabase itemDatabase;
     
     // Public accessors with null safety
     public static XPOrbPool XPOrbPool => Instance?.xpOrbPool;
@@ -45,9 +47,11 @@ public class GameServices : MonoBehaviour
     public static CollisionManager CollisionManager => Instance?.collisionManager;
     public static OrbiterManager OrbiterManager => Instance?.orbiterManager;
     public static LevelUpUI LevelUpUI => Instance?.levelUpUI;
+    public static TreasureUI TreasureUI => Instance?.treasureUI;
     public static DamageNumberPool DamageNumberPool => Instance?.damageNumberPool;
     public static Player Player => Instance?.player;
     public static DamageCalculator DamageCalculator => Instance?.damageCalculator;
+    public static ItemDatabase ItemDatabase => Instance?.itemDatabase;
     
     private void Awake()
     {
@@ -83,9 +87,27 @@ public class GameServices : MonoBehaviour
         collisionManager = FindFirstObjectByType<CollisionManager>();
         orbiterManager = FindFirstObjectByType<OrbiterManager>();
         levelUpUI = FindFirstObjectByType<LevelUpUI>();
+        treasureUI = FindFirstObjectByType<TreasureUI>();
         damageNumberPool = FindFirstObjectByType<DamageNumberPool>();
         player = FindFirstObjectByType<Player>();
         damageCalculator = FindFirstObjectByType<DamageCalculator>();
+        itemDatabase = FindFirstObjectByType<ItemDatabase>();
+        
+        // Create ItemDatabase if not found (essential for item system)
+        if (itemDatabase == null)
+        {
+            GameObject itemDbObj = new GameObject("ItemDatabase");
+            itemDatabase = itemDbObj.AddComponent<ItemDatabase>();
+            DebugLog.Info("[GameServices] Created ItemDatabase");
+        }
+        
+        // Create TreasureUI if not found (essential for chest system)
+        if (treasureUI == null)
+        {
+            GameObject treasureUIObj = new GameObject("TreasureUI");
+            treasureUI = treasureUIObj.AddComponent<TreasureUI>();
+            DebugLog.Info("[GameServices] Created TreasureUI");
+        }
         
         // Log warnings for missing services
         if (xpOrbPool == null) DebugLog.Warning("[GameServices] XPOrbPool not found");

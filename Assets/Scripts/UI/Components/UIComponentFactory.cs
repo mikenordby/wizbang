@@ -144,9 +144,9 @@ public static class UIComponentFactory
         GameObject optionObj = new GameObject("UpgradeOption");
         optionObj.transform.SetParent(parent, false);
         
-        // Add RectTransform (larger size for better visibility)
+        // Add RectTransform (large size for better visibility)
         RectTransform optionRect = optionObj.AddComponent<RectTransform>();
-        optionRect.sizeDelta = new Vector2(320f, 280f);
+        optionRect.sizeDelta = new Vector2(400f, 380f);
         
         // Add background image
         Image backgroundImage = optionObj.AddComponent<Image>();
@@ -162,7 +162,7 @@ public static class UIComponentFactory
         categoryObj.transform.SetParent(optionObj.transform, false);
         Text categoryText = categoryObj.AddComponent<Text>();
         categoryText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        categoryText.fontSize = 12;
+        categoryText.fontSize = 16;
         categoryText.alignment = TextAnchor.MiddleCenter;
         categoryText.color = Color.white;
         categoryText.fontStyle = FontStyle.Bold;
@@ -179,7 +179,7 @@ public static class UIComponentFactory
         nameObj.transform.SetParent(optionObj.transform, false);
         Text nameText = nameObj.AddComponent<Text>();
         nameText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        nameText.fontSize = 20;
+        nameText.fontSize = 26;
         nameText.alignment = TextAnchor.MiddleCenter;
         nameText.color = Color.white;
         nameText.fontStyle = FontStyle.Bold;
@@ -196,7 +196,7 @@ public static class UIComponentFactory
         descObj.transform.SetParent(optionObj.transform, false);
         Text descText = descObj.AddComponent<Text>();
         descText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        descText.fontSize = 14;
+        descText.fontSize = 18;
         descText.alignment = TextAnchor.UpperCenter;
         descText.color = new Color(0.8f, 0.8f, 0.8f);
         descText.text = "Description of the upgrade";

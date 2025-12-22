@@ -1,10 +1,13 @@
 using UnityEngine;
+using System.Collections;
 
 /// <summary>
-/// Treasure chest pickup that grants a level-up perk selection without leveling up.
+/// Treasure chest pickup that reveals items with an animated sequence.
+/// Animation intensity increases with item rarity (inspired by Megabonk).
 /// </summary>
 public class TreasureChest : MonoBehaviour
 {
+    
     private SpriteRenderer spriteRenderer;
     private CircleCollider2D chestCollider;
     private bool isCollected = false;
@@ -135,17 +138,52 @@ public class TreasureChest : MonoBehaviour
         if (player != null)
         {
             isCollected = true;
-            
-            // Show perk selection UI (not actual level-up)
-            LevelUpUI levelUpUI = GameServices.LevelUpUI;
-            if (levelUpUI != null)
-            {
-                DebugLog.Info($"[TreasureChest] Player collected chest! Showing perk selection");
-                levelUpUI.ShowChestReward(player.CurrentLevel); // Special method for treasure chest
-            }
-            
-            // Destroy chest
-            Destroy(gameObject);
+            StartCoroutine(OpenChestWithAnimation(player));
         }
     }
+    
+    /// <summary>
+    /// Treasure chest opened - show TreasureUI with item reveal.
+    /// </summary>
+    private IEnumerator OpenChestWithAnimation(Player player)
+    {
+        // Disable collider to prevent re-triggering
+        if (chestCollider != null)
+            chestCollider.enabled = false;
+        
+        // Determine rarity of the reward
+        ItemDatabase itemDb = ItemDatabase.Instance;
+        ItemDefinition itemDef = null;
+        
+        if (itemDb != null && itemDb.ItemCount > 0)
+        {
+            itemDef = itemDb.GetRandomItem();
+        }
+        else
+        {
+            DebugLog.Warning("[TreasureChest] ItemDatabase not available or empty!");
+            Destroy(gameObject);
+            yield break;
+        }
+        
+        DebugLog.Info($"[TreasureChest] Chest opened! Rolling item: [{itemDef.rarity}] {itemDef.displayName}");
+        
+        // Find or create TreasureUI
+        TreasureUI treasureUI = FindFirstObjectByType<TreasureUI>();
+        if (treasureUI == null)
+        {
+            DebugLog.Info("[TreasureChest] TreasureUI not found, creating one");
+            GameObject uiObj = new GameObject("TreasureUI");
+            treasureUI = uiObj.AddComponent<TreasureUI>();
+        }
+        
+        // Show treasure UI with the rolled item
+        treasureUI.ShowTreasure(itemDef);
+        
+        // Clean up chest immediately - animation happens in UI
+        Destroy(gameObject);
+        
+        yield break;
+    }
+    
 }

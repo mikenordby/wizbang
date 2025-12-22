@@ -153,6 +153,17 @@ public class OrbiterWeapon : Weapon, IWeaponCollisionHandler
                             DamageResult result = DamageCalculator.Instance.CalculateDamage(context);
                             enemyHealth.TakeDamage(result.finalDamage);
                             
+                            // Lifesteal healing (chance to heal 1 HP on hit)
+                            if (player != null && player.LifestealChance > 0f && Random.value < player.LifestealChance)
+                            {
+                                Health playerHealth = player.GetComponent<Health>();
+                                if (playerHealth != null && playerHealth.CurrentHealth < playerHealth.MaxHealth)
+                                {
+                                    playerHealth.Heal(1f);
+                                    DebugLog.Info($"[OrbiterWeapon] 💚 Lifesteal! Healed 1 HP (chance={player.LifestealChance*100:F0}%)");
+                                }
+                            }
+                            
                             // Show damage number
                             DamageNumberPool damagePool = GameServices.DamageNumberPool;
                             if (damagePool != null)

@@ -11,6 +11,8 @@ public class Health : MonoBehaviour, IDamageable
     
     private float currentHealth;
     private float iFrameTimer = 0f;
+    private float regenRate = 0f; // HP per second
+    private float regenAccumulator = 0f; // Tracks partial HP for slow regen
     private SpriteRenderer spriteRenderer;
     
     public float MaxHealth => maxHealth;
@@ -106,8 +108,51 @@ public class Health : MonoBehaviour, IDamageable
         DebugLog.Info($"[Health] Max health increased to {maxHealth}, current: {currentHealth}");
     }
     
+    /// <summary>
+    /// Set the health regeneration rate (HP per second)
+    /// </summary>
+    public void SetRegenRate(float hpPerSecond)
+    {
+        regenRate = hpPerSecond;
+        DebugLog.Info($"[Health] Regen rate set to {regenRate:F1} HP/sec");
+    }
+    
+    /// <summary>
+    /// Add to the regeneration rate (for stacking bonuses)
+    /// </summary>
+    public void AddRegenRate(float amount)
+    {
+        regenRate += amount;
+        DebugLog.Info($"[Health] Regen rate increased by {amount:F1}, now {regenRate:F1} HP/sec");
+    }
+    
     private void Update()
     {
+        // Only run during gameplay
+        if (GamePhaseManager.CurrentPhase != GamePhase.Gameplay) return;
+        if (GameState.IsPaused) return;
+        
+        // Health regeneration
+        if (regenRate > 0f && currentHealth < maxHealth && currentHealth > 0f)
+        {
+            regenAccumulator += regenRate * Time.deltaTime;
+            
+            // Apply regen in whole HP increments to avoid float precision issues
+            if (regenAccumulator >= 1f)
+            {
+                float healAmount = Mathf.Floor(regenAccumulator);
+                regenAccumulator -= healAmount;
+                
+                float newHealth = Mathf.Min(currentHealth + healAmount, maxHealth);
+                if (newHealth != currentHealth)
+                {
+                    currentHealth = newHealth;
+                    OnHealthChanged?.Invoke(currentHealth);
+                    DebugLog.Verbose($"[Health] Regenerated {healAmount:F0} HP, now {currentHealth:F0}/{maxHealth:F0}");
+                }
+            }
+        }
+        
         // Countdown i-frames
         if (iFrameTimer > 0f)
         {

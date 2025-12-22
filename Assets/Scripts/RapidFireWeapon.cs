@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections.Generic;
 
 /// <summary>
 /// Rapid-fire pistol weapon that shoots at nearest enemy at high speed.
@@ -23,7 +24,10 @@ public class RapidFireWeapon : Weapon
         basePierce = 0; // No pierce by default
         baseRange = 0.8f; // Shorter range
         projectileSize = 0.7f; // Smaller bullets
-        
+
+        // Set weapon tags for synergy system
+        weaponTags = new List<WeaponTag> { WeaponTag.Gun };
+
         base.Awake();
         
         projectilePool = GameServices.ProjectilePool;

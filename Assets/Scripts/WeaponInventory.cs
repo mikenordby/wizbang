@@ -58,10 +58,13 @@ public class WeaponInventory : MonoBehaviour
         
         activeWeapons.Add(weapon);
         DebugLog.Info($"[WeaponInventory] Added {weapon.WeaponName} (slot {activeWeapons.Count}/{maxWeaponSlots})");
-        
+
         // Trigger weapon added event
         GameEvents.TriggerWeaponAdded(weapon);
-        
+
+        // Recalculate synergies
+        GameServices.SynergyManager?.RecalculateSynergies();
+
         return true;
     }
     
@@ -136,11 +139,11 @@ public class WeaponInventory : MonoBehaviour
             "ProjectileWeapon" => weaponObj.AddComponent<ProjectileWeapon>(),
             "MagicMissile" => weaponObj.AddComponent<ProjectileWeapon>(),
             "OrbiterWeapon" => weaponObj.AddComponent<OrbiterWeapon>(),
-            "BoomerangWeapon" => weaponObj.AddComponent<BoomerangWeapon>(),
             "RapidFireWeapon" => weaponObj.AddComponent<RapidFireWeapon>(),
             "LightningWeapon" => weaponObj.AddComponent<LightningWeapon>(),
             "PoisonWeapon" => weaponObj.AddComponent<PoisonWeapon>(),
             "LaserWeapon" => weaponObj.AddComponent<LaserWeapon>(),
+            "FireRingWeapon" => weaponObj.AddComponent<FireRingWeapon>(),
             _ => null
         };
         
@@ -166,7 +169,15 @@ public class WeaponInventory : MonoBehaviour
     {
         return new List<Weapon>(activeWeapons);
     }
-    
+
+    /// <summary>
+    /// Get list of weapons (alias for GetActiveWeapons, used by SynergyManager)
+    /// </summary>
+    public List<Weapon> GetWeapons()
+    {
+        return activeWeapons;
+    }
+
     /// <summary>
     /// Check if inventory has space for new weapon.
     /// </summary>
@@ -174,12 +185,68 @@ public class WeaponInventory : MonoBehaviour
     {
         return activeWeapons.Count < maxWeaponSlots;
     }
-    
+
     /// <summary>
     /// Get number of active weapons.
     /// </summary>
     public int GetWeaponCount()
     {
         return activeWeapons.Count;
+    }
+
+    /// <summary>
+    /// Remove a weapon from the inventory (used for combinations).
+    /// </summary>
+    public bool RemoveWeapon(Weapon weapon)
+    {
+        if (weapon == null || !activeWeapons.Contains(weapon))
+        {
+            DebugLog.Warning("[WeaponInventory] Cannot remove weapon: not in inventory");
+            return false;
+        }
+
+        activeWeapons.Remove(weapon);
+        DebugLog.Info($"[WeaponInventory] Removed {weapon.WeaponName}");
+
+        // Trigger weapon removed event
+        GameEvents.TriggerWeaponRemoved(weapon.WeaponName);
+
+        // Destroy weapon GameObject
+        Destroy(weapon.gameObject);
+
+        // Recalculate synergies
+        GameServices.SynergyManager?.RecalculateSynergies();
+
+        return true;
+    }
+
+    /// <summary>
+    /// Add a weapon instance directly to the inventory (used for rollback).
+    /// Does NOT create a new weapon, just adds existing one.
+    /// </summary>
+    public bool AddWeaponDirect(Weapon weapon)
+    {
+        if (weapon == null)
+        {
+            DebugLog.Warning("[WeaponInventory] Cannot add null weapon");
+            return false;
+        }
+
+        if (activeWeapons.Count >= maxWeaponSlots)
+        {
+            DebugLog.Warning($"[WeaponInventory] Cannot add weapon - inventory full ({maxWeaponSlots} slots)");
+            return false;
+        }
+
+        activeWeapons.Add(weapon);
+        DebugLog.Info($"[WeaponInventory] Added {weapon.WeaponName} directly (slot {activeWeapons.Count}/{maxWeaponSlots})");
+
+        // Trigger weapon added event
+        GameEvents.TriggerWeaponAdded(weapon);
+
+        // Recalculate synergies
+        GameServices.SynergyManager?.RecalculateSynergies();
+
+        return true;
     }
 }

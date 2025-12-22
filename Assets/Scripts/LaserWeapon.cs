@@ -27,8 +27,12 @@ public class LaserWeapon : Weapon
         baseFireRate = 2f;
         basePierce = 999; // Infinite pierce
         damageType = DamageType.Fire;
-        
+
+        // Set weapon tags for synergy system
+        weaponTags = new List<WeaponTag> { WeaponTag.Fire };
+
         enemyPool = FindFirstObjectByType<EnemyPool>();
+        RecalculateStats(); // Recalc after setting tags
     }
     
     protected override void Update()

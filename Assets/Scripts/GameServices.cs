@@ -39,7 +39,9 @@ public class GameServices : MonoBehaviour
     private Player player;
     private DamageCalculator damageCalculator;
     private ItemDatabase itemDatabase;
-    
+    private SynergyManager synergyManager;
+    private CombinationManager combinationManager;
+
     // Public accessors with null safety
     public static XPOrbPool XPOrbPool => Instance?.xpOrbPool;
     public static EnemyPool EnemyPool => Instance?.enemyPool;
@@ -52,6 +54,8 @@ public class GameServices : MonoBehaviour
     public static Player Player => Instance?.player;
     public static DamageCalculator DamageCalculator => Instance?.damageCalculator;
     public static ItemDatabase ItemDatabase => Instance?.itemDatabase;
+    public static SynergyManager SynergyManager => Instance?.synergyManager;
+    public static CombinationManager CombinationManager => Instance?.combinationManager;
     
     private void Awake()
     {
@@ -92,7 +96,9 @@ public class GameServices : MonoBehaviour
         player = FindFirstObjectByType<Player>();
         damageCalculator = FindFirstObjectByType<DamageCalculator>();
         itemDatabase = FindFirstObjectByType<ItemDatabase>();
-        
+        synergyManager = FindFirstObjectByType<SynergyManager>();
+        combinationManager = FindFirstObjectByType<CombinationManager>();
+
         // Create ItemDatabase if not found (essential for item system)
         if (itemDatabase == null)
         {
@@ -118,5 +124,26 @@ public class GameServices : MonoBehaviour
         if (levelUpUI == null) DebugLog.Warning("[GameServices] LevelUpUI not found");
         if (player == null) DebugLog.Warning("[GameServices] Player not found");
         if (damageCalculator == null) DebugLog.Warning("[GameServices] DamageCalculator not found");
+        if (synergyManager == null) DebugLog.Warning("[GameServices] SynergyManager not found");
+        if (combinationManager == null) DebugLog.Warning("[GameServices] CombinationManager not found");
+    }
+
+    // Manual registration methods (for services that register themselves)
+    public static void RegisterSynergyManager(SynergyManager manager)
+    {
+        if (Instance != null)
+        {
+            Instance.synergyManager = manager;
+            DebugLog.Info("[GameServices] SynergyManager registered");
+        }
+    }
+
+    public static void RegisterCombinationManager(CombinationManager manager)
+    {
+        if (Instance != null)
+        {
+            Instance.combinationManager = manager;
+            DebugLog.Info("[GameServices] CombinationManager registered");
+        }
     }
 }

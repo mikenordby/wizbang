@@ -23,8 +23,12 @@ public class PoisonWeapon : Weapon
         baseDamage = 4f; // Lower base damage since it's DoT
         baseFireRate = 1.5f; // Slower fire rate
         damageType = DamageType.Poison;
-        
+
+        // Set weapon tags for synergy system
+        weaponTags = new List<WeaponTag> { WeaponTag.Poison, WeaponTag.Area };
+
         enemyPool = FindFirstObjectByType<EnemyPool>();
+        RecalculateStats(); // Recalc after setting tags
     }
     
     protected override void Fire()

@@ -11,7 +11,8 @@ public class UpgradeChoice
     {
         NewWeapon,
         WeaponUpgrade,
-        PlayerStat
+        PlayerStat,
+        WeaponCombination
     }
     
     public ChoiceType Type { get; set; }
@@ -21,10 +22,15 @@ public class UpgradeChoice
     
     // For weapon choices
     public string WeaponType { get; set; }
-    
+
     // For stat upgrades
     public PlayerStatType StatType { get; set; }
-    
+
+    // For weapon combinations
+    public WeaponCombination CombinationRecipe { get; set; }
+    public Weapon Weapon1 { get; set; }
+    public Weapon Weapon2 { get; set; }
+
     public UpgradeChoice(ChoiceType type, string displayName, string description)
     {
         Type = type;
@@ -63,6 +69,7 @@ public class UpgradeChoiceGenerator : MonoBehaviour
     [SerializeField] private float newWeaponWeight = 1.0f;
     [SerializeField] private float weaponUpgradeWeight = 1.0f;
     [SerializeField] private float playerStatWeight = 1.0f;
+    [SerializeField] private float combinationWeight = 1.5f; // Higher weight for combinations (more exciting)
     
     [Header("Reroll Settings")]
     [SerializeField] private int maxRerolls = 1;
@@ -71,28 +78,28 @@ public class UpgradeChoiceGenerator : MonoBehaviour
     private WeaponInventory weaponInventory;
     private Player player;
     
-    // All available weapon types
+    // All available weapon types (updated 2025-12-22: removed Boomerang)
     private static readonly string[] AllWeaponTypes = new string[]
     {
         "ProjectileWeapon",
         "OrbiterWeapon",
-        "BoomerangWeapon",
         "RapidFireWeapon",
         "LightningWeapon",
         "PoisonWeapon",
-        "LaserWeapon"
+        "LaserWeapon",
+        "FireRingWeapon"
     };
     
     // Weapon display names and descriptions
     private static readonly Dictionary<string, (string name, string desc)> WeaponInfo = new Dictionary<string, (string, string)>
     {
-        { "ProjectileWeapon", ("Magic Missile", "Straight-firing magical projectiles") },
+        { "ProjectileWeapon", ("Magic Missile", "Auto-aim magical projectiles") },
         { "OrbiterWeapon", ("Orbiting Blades", "Knives that circle around you") },
-        { "BoomerangWeapon", ("Boomerang", "Returns after hitting enemies") },
         { "RapidFireWeapon", ("Rapid Fire", "High fire rate, lower damage") },
         { "LightningWeapon", ("Chain Lightning", "Arcs between nearby enemies") },
         { "PoisonWeapon", ("Poison Cloud", "Area damage over time") },
-        { "LaserWeapon", ("Piercing Laser", "Continuous beam through all enemies") }
+        { "LaserWeapon", ("Piercing Laser", "Continuous beam through all enemies") },
+        { "FireRingWeapon", ("Circle of Fire", "Damaging ring around player") }
     };
     
     // Player stat info
@@ -199,7 +206,31 @@ public class UpgradeChoiceGenerator : MonoBehaviour
                     pool.Add(choice);
             }
         }
-        
+
+        // Add weapon combination choices (if any combinations available)
+        CombinationManager combinationManager = GameServices.CombinationManager;
+        if (combinationManager != null)
+        {
+            var availableCombinations = combinationManager.GetAvailableCombinations();
+            foreach (var (combo, weapon1, weapon2) in availableCombinations)
+            {
+                var choice = new UpgradeChoice(
+                    UpgradeChoice.ChoiceType.WeaponCombination,
+                    combo.combinationName,
+                    $"Combine {weapon1.WeaponName} + {weapon2.WeaponName}\n{combo.description}"
+                );
+                choice.CombinationRecipe = combo;
+                choice.Weapon1 = weapon1;
+                choice.Weapon2 = weapon2;
+
+                int weight = Mathf.RoundToInt(combinationWeight * 10);
+                for (int i = 0; i < weight; i++)
+                    pool.Add(choice);
+
+                DebugLog.Info($"[UpgradeChoiceGenerator] Added combination choice: {combo.combinationName}");
+            }
+        }
+
         // Add player stat upgrade choices
         foreach (var statType in System.Enum.GetValues(typeof(PlayerStatType)).Cast<PlayerStatType>())
         {
@@ -237,7 +268,7 @@ public class UpgradeChoiceGenerator : MonoBehaviour
         {
             if (choice.Type != newChoice.Type) continue;
             
-            if (choice.Type == UpgradeChoice.ChoiceType.NewWeapon || 
+            if (choice.Type == UpgradeChoice.ChoiceType.NewWeapon ||
                 choice.Type == UpgradeChoice.ChoiceType.WeaponUpgrade)
             {
                 if (choice.WeaponType == newChoice.WeaponType)
@@ -246,6 +277,13 @@ public class UpgradeChoiceGenerator : MonoBehaviour
             else if (choice.Type == UpgradeChoice.ChoiceType.PlayerStat)
             {
                 if (choice.StatType == newChoice.StatType)
+                    return true;
+            }
+            else if (choice.Type == UpgradeChoice.ChoiceType.WeaponCombination)
+            {
+                // Combinations are unique by their recipe name
+                if (choice.CombinationRecipe != null && newChoice.CombinationRecipe != null &&
+                    choice.CombinationRecipe.combinationName == newChoice.CombinationRecipe.combinationName)
                     return true;
             }
         }
@@ -275,6 +313,30 @@ public class UpgradeChoiceGenerator : MonoBehaviour
             case UpgradeChoice.ChoiceType.PlayerStat:
                 ApplyStatUpgrade(choice.StatType);
                 DebugLog.Info($"[Upgrade] Upgraded stat: {choice.DisplayName}");
+                break;
+
+            case UpgradeChoice.ChoiceType.WeaponCombination:
+                CombinationManager combinationManager = GameServices.CombinationManager;
+                if (combinationManager != null && choice.CombinationRecipe != null)
+                {
+                    bool success = combinationManager.CombineWeapons(
+                        choice.CombinationRecipe,
+                        choice.Weapon1,
+                        choice.Weapon2
+                    );
+                    if (success)
+                    {
+                        DebugLog.Info($"[Upgrade] Combined weapons: {choice.DisplayName}");
+                    }
+                    else
+                    {
+                        DebugLog.Error($"[Upgrade] Failed to combine weapons: {choice.DisplayName}");
+                    }
+                }
+                else
+                {
+                    DebugLog.Error("[Upgrade] CombinationManager or recipe is null!");
+                }
                 break;
         }
     }

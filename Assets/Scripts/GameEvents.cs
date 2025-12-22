@@ -88,7 +88,13 @@ public static class GameEvents
     /// Listeners: Audio (weapon sound), VFX (muzzle flash), analytics
     /// </summary>
     public static event Action<string, int> OnWeaponFired;
-    
+
+    /// <summary>
+    /// Fired when two weapons are combined. Passes combined weapon name.
+    /// Listeners: UI (notification), audio, VFX, achievements
+    /// </summary>
+    public static event Action<string> OnWeaponCombined;
+
     // ===== GAME STATE EVENTS =====
     
     /// <summary>
@@ -186,7 +192,12 @@ public static class GameEvents
     {
         OnWeaponFired?.Invoke(weaponName, projectileCount);
     }
-    
+
+    public static void TriggerWeaponCombined(string combinedWeaponName)
+    {
+        OnWeaponCombined?.Invoke(combinedWeaponName);
+    }
+
     public static void TriggerGamePaused(bool isPaused)
     {
         OnGamePaused?.Invoke(isPaused);
@@ -233,6 +244,7 @@ public static class GameEvents
         OnWeaponUpgraded = null;
         OnWeaponRemoved = null;
         OnWeaponFired = null;
+        OnWeaponCombined = null;
         OnGamePaused = null;
         OnGameOver = null;
         OnGameRestart = null;

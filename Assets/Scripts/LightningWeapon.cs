@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections.Generic;
 
 /// <summary>
 /// Lightning weapon that chains between nearby enemies.
@@ -23,8 +24,12 @@ public class LightningWeapon : Weapon
         baseDamage = 15f;
         baseFireRate = 0.8f; // Slower fire rate
         damageType = DamageType.Lightning;
-        
+
+        // Set weapon tags for synergy system
+        weaponTags = new List<WeaponTag> { WeaponTag.Lightning };
+
         enemyPool = FindFirstObjectByType<EnemyPool>();
+        RecalculateStats(); // Recalc after setting tags
     }
     
     protected override void Fire()

@@ -18,7 +18,10 @@ public class OrbiterWeapon : Weapon, IWeaponCollisionHandler
         baseFireRate = 0f; // Always active, no firing
         projectileCount = 1; // Start with 1 orbiter (knight gets bonus from character data)
         projectileSize = 1.5f; // Larger spinning blades
-        
+
+        // Set weapon tags for synergy system
+        weaponTags = new List<WeaponTag> { WeaponTag.Melee };
+
         base.Awake(); // This calls RecalculateStats()
         
         // Find or create OrbiterManager
@@ -45,7 +48,7 @@ public class OrbiterWeapon : Weapon, IWeaponCollisionHandler
     /// <summary>
     /// Override RecalculateStats to update orbiter properties
     /// </summary>
-    protected override void RecalculateStats()
+    public override void RecalculateStats()
     {
         base.RecalculateStats();
         

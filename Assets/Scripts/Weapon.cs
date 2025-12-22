@@ -20,9 +20,13 @@ public abstract class Weapon : MonoBehaviour
     [Header("Projectile Properties")]
     [Tooltip("Visual and collision size multiplier (1.0 = normal)")]
     [SerializeField] protected float projectileSize = 1f;
-    
+
     [Tooltip("Type of damage (affects future elemental interactions)")]
     [SerializeField] protected DamageType damageType = DamageType.Physical;
+
+    [Header("Weapon Tags")]
+    [Tooltip("Tags for synergy bonuses (matching tags across weapons = damage multipliers)")]
+    [SerializeField] protected List<WeaponTag> weaponTags = new List<WeaponTag>();
     
     // Individual upgrade tracking
     protected Dictionary<WeaponUpgrade.UpgradeType, WeaponUpgrade> upgrades = new Dictionary<WeaponUpgrade.UpgradeType, WeaponUpgrade>();
@@ -193,17 +197,35 @@ public abstract class Weapon : MonoBehaviour
     
     /// <summary>
     /// Recalculate weapon stats based on level and player multipliers.
+    /// Public so SynergyManager can trigger recalculation when synergies change.
     /// </summary>
-    protected virtual void RecalculateStats()
+    public virtual void RecalculateStats()
     {
         // Damage: base + upgrade bonus + player multiplier
         float damageUpgradeBonus = upgrades[WeaponUpgrade.UpgradeType.Damage].GetDamageBonus();
         currentDamage = baseDamage * (1f + damageUpgradeBonus / 100f);
         if (player != null)
             currentDamage *= player.DamageMultiplier;
-        
+
+        // Apply synergy bonuses
+        SynergyManager synergyManager = GameServices.SynergyManager;
+        if (synergyManager != null)
+        {
+            float synergyMultiplier = 1f;
+            foreach (WeaponTag tag in weaponTags)
+            {
+                synergyMultiplier += synergyManager.GetSynergyMultiplier(tag);
+            }
+            currentDamage *= synergyMultiplier;
+
+            if (synergyMultiplier > 1f)
+            {
+                DebugLog.Info($"[Weapon.Synergy] {weaponName} synergy multiplier: {synergyMultiplier:F2}x", "Weapon");
+            }
+        }
+
         DebugLog.Info($"[Weapon.RecalculateStats] {weaponName}: baseDamage={baseDamage:F1}, upgradeBonus={damageUpgradeBonus:F1}%, playerMult={player?.DamageMultiplier:F2} → currentDamage={currentDamage:F1}", "Weapon");
-        
+
         // Fire rate: base + upgrade bonus + player attack speed
         float fireRateUpgradeBonus = upgrades[WeaponUpgrade.UpgradeType.FireRate].GetFireRateBonus();
         currentFireRate = baseFireRate * (1f + fireRateUpgradeBonus / 100f);
@@ -239,4 +261,5 @@ public abstract class Weapon : MonoBehaviour
     public float Range => currentRange;
     public float ProjectileSize => currentProjectileSize;
     public Dictionary<WeaponUpgrade.UpgradeType, WeaponUpgrade> Upgrades => upgrades;
+    public List<WeaponTag> GetTags() => weaponTags;
 }

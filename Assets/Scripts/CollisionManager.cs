@@ -14,9 +14,6 @@ public class CollisionManager : MonoBehaviour
     [SerializeField] private OrbiterManager orbiterManager;
     [SerializeField] private float playerCollisionRadius = 0.4f; // Match wizard body size
     
-    // Legacy direct reference for backward compatibility
-    private BoomerangWeapon boomerangWeapon;
-    
     // New weapon registration system
     private List<IWeaponCollisionHandler> registeredWeapons = new List<IWeaponCollisionHandler>();
     
@@ -113,13 +110,6 @@ public class CollisionManager : MonoBehaviour
         // Auto-register all weapons that implement IWeaponCollisionHandler
         if (playerTransform != null)
         {
-            // Register BoomerangWeapon
-            boomerangWeapon = playerTransform.GetComponent<BoomerangWeapon>();
-            if (boomerangWeapon != null)
-            {
-                RegisterWeapon(boomerangWeapon);
-            }
-            
             // Register OrbiterWeapon (still uses IWeaponCollisionHandler)
             OrbiterWeapon orbiterWeapon = playerTransform.GetComponent<OrbiterWeapon>();
             if (orbiterWeapon != null)
@@ -127,10 +117,17 @@ public class CollisionManager : MonoBehaviour
                 RegisterWeapon(orbiterWeapon);
             }
             
+            // Register FireRingWeapon (uses IWeaponCollisionHandler)
+            FireRingWeapon fireRingWeapon = playerTransform.GetComponent<FireRingWeapon>();
+            if (fireRingWeapon != null)
+            {
+                RegisterWeapon(fireRingWeapon);
+            }
+            
             // NOTE: ProjectileWeapon and RapidFireWeapon no longer register here
             // They now use centralized collision detection via ProcessProjectileCollisions()
             
-            DebugLog.Info($"[CollisionManager] Registered {registeredWeapons.Count} IWeaponCollisionHandler weapons (orbiters, boomerangs, etc.)", "Collision");
+            DebugLog.Info($"[CollisionManager] Registered {registeredWeapons.Count} IWeaponCollisionHandler weapons (orbiters, fire rings, etc.)", "Collision");
         }
         
         DebugLog.Verbose($"[CollisionManager] Starting - orbiterManager={orbiterManager != null}, enemyPool={enemyPool != null}, projectilePool={projectilePool != null}");
@@ -342,7 +339,13 @@ public class CollisionManager : MonoBehaviour
                                         damagePool.ShowDamage(enemy.Position, result.finalDamage);
                                 }
                             }
-                            
+
+                            // Invoke hit callback if set (for explosions, special effects, etc.)
+                            if (projectile is BaseProjectile baseProj && baseProj.OnHitCallback != null)
+                            {
+                                baseProj.OnHitCallback.Invoke(baseProj, enemy.Position);
+                            }
+
                             // Deactivate if exceeded pierce limit
                             if (projectile.EnemiesHit > projectile.Pierce)
                             {

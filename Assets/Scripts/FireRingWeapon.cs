@@ -28,7 +28,10 @@ public class FireRingWeapon : Weapon, IWeaponCollisionHandler
         baseRange = 1f; // Could affect radius
         projectileSize = 1f; // Could affect radius
         damageType = DamageType.Fire; // Applies burning
-        
+
+        // Set weapon tags for synergy system
+        weaponTags = new List<WeaponTag> { WeaponTag.Area, WeaponTag.Fire };
+
         base.Awake();
         
         collisionManager = GameServices.CollisionManager;
@@ -173,10 +176,10 @@ public class FireRingWeapon : Weapon, IWeaponCollisionHandler
         }
     }
     
-    protected override void RecalculateStats()
+    public override void RecalculateStats()
     {
         base.RecalculateStats();
-        
+
         // Ring radius scales with range AND projectile size upgrades
         float effectiveRadius = ringRadius * currentRange * currentProjectileSize;
         

@@ -18,7 +18,10 @@ public class ProjectileWeapon : Weapon
         baseDamage = 10f;
         baseFireRate = 1f;
         projectileSize = 1.2f; // Standard projectile size
-        
+
+        // Set weapon tags for synergy system
+        weaponTags = new List<WeaponTag> { WeaponTag.Arcane };
+
         base.Awake(); // This calls RecalculateStats()
         
         // Find required pools

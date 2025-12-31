@@ -3,7 +3,7 @@ using UnityEngine;
 /// <summary>
 /// Interface for weapons that need to handle their own collision detection.
 /// Allows weapons to register with CollisionManager and handle collisions independently.
-/// Used by: OrbiterWeapon, BoomerangWeapon, FireRingWeapon
+/// Used by: OrbiterBehavior, AoEBehavior, and other data-driven weapon behaviors.
 /// </summary>
 public interface IWeaponCollisionHandler
 {

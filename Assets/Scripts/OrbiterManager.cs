@@ -24,7 +24,7 @@ public class OrbiterManager : MonoBehaviour
         
         orbiters = new List<OrbiterProjectile>();
         
-        // Don't create orbiters by default - let OrbiterWeapon control this
+        // Don't create orbiters by default - let OrbiterBehavior control this
         DebugLog.Info($"OrbiterManager: Initialized (waiting for weapon activation)");
     }
     

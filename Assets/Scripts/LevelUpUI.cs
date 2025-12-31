@@ -162,13 +162,16 @@ public class LevelUpUI : MonoBehaviour
             DebugLog.Error("[LevelUpUI] UpgradeChoiceGenerator not found!");
             return;
         }
-        
+
+        // Reset rerolls for new level-up
+        choiceGenerator.ResetRerolls();
+
         levelUpPanel.SetActive(true);
         levelText.text = $"LEVEL {newLevel}!";
-        
+
         // Generate choices using new system
         currentChoices = choiceGenerator.GenerateChoices();
-        
+
         DisplayChoices();
     }
     
@@ -182,14 +185,17 @@ public class LevelUpUI : MonoBehaviour
             DebugLog.Error("[LevelUpUI] UpgradeChoiceGenerator not found!");
             return;
         }
-        
+
+        // Reset rerolls for new chest reward
+        choiceGenerator.ResetRerolls();
+
         levelUpPanel.SetActive(true);
         levelText.text = "TREASURE!";
         levelText.color = new Color(1f, 0.84f, 0f); // Gold color
-        
+
         // Generate choices using new system
         currentChoices = choiceGenerator.GenerateChoices();
-        
+
         DisplayChoices();
     }
     
@@ -267,12 +273,13 @@ public class LevelUpUI : MonoBehaviour
             DebugLog.Warning("[LevelUpUI] No rerolls remaining!");
             return;
         }
-        
+
         choiceGenerator.UseReroll();
-        DebugLog.Info("[LevelUpUI] Rerolling upgrade choices...");
-        
-        // Regenerate choices
-        ShowUI(player.CurrentLevel);
+        DebugLog.Info($"[LevelUpUI] Rerolling upgrade choices... ({choiceGenerator.GetRemainingRerolls()} left)");
+
+        // Regenerate choices WITHOUT resetting rerolls (don't call ShowUI)
+        currentChoices = choiceGenerator.GenerateChoices();
+        DisplayChoices();
     }
     
     private void UpdateRerollButton()

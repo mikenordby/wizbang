@@ -20,8 +20,8 @@ public class HeroDefinition : ScriptableObject
     public string description = "Balanced character with standard stats";
     
     [Header("Starting Loadout")]
-    [Tooltip("Weapon type this hero starts with (e.g., 'ProjectileWeapon', 'OrbiterWeapon')")]
-    public string startingWeaponType = "ProjectileWeapon";
+    [Tooltip("Weapon ID or legacy type name (e.g., 'magic_missile', 'orbiting_blades', or legacy 'ProjectileWeapon')")]
+    public string startingWeaponType = "magic_missile";
     
     [Header("Base Stats (Immutable)")]
     [Tooltip("Base max health (before modifiers)")]

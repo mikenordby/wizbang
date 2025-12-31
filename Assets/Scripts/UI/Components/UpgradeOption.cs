@@ -16,9 +16,10 @@ public class UpgradeOption : MonoBehaviour
     [SerializeField] private Button button;
     
     [Header("Visual Settings")]
-    [SerializeField] private Color weaponColor = new Color(1f, 0.3f, 0.3f);      // Red
-    [SerializeField] private Color upgradeColor = new Color(0.3f, 0.8f, 1f);     // Cyan
-    [SerializeField] private Color statColor = new Color(0.4f, 1f, 0.4f);        // Green
+    [SerializeField] private Color weaponColor = new Color(1f, 0.3f, 0.3f);      // Red - new weapons
+    [SerializeField] private Color upgradeColor = new Color(0.3f, 0.8f, 1f);     // Cyan - weapon upgrades
+    [SerializeField] private Color statColor = new Color(0.4f, 1f, 0.4f);        // Green - stat upgrades
+    [SerializeField] private Color combinationColor = new Color(1f, 0.85f, 0f);  // Yellow/Gold - combinations
     [SerializeField] private Color defaultColor = new Color(0.5f, 0.5f, 0.5f);   // Gray
     
     private UpgradeChoice upgradeChoice;
@@ -63,7 +64,12 @@ public class UpgradeOption : MonoBehaviour
                     categoryText.text = "[STAT]";
                     backgroundImage.color = statColor;
                     break;
-                    
+
+                case UpgradeChoice.ChoiceType.WeaponCombination:
+                    categoryText.text = "[COMBINE]";
+                    backgroundImage.color = combinationColor;
+                    break;
+
                 default:
                     categoryText.text = "[UPGRADE]";
                     backgroundImage.color = defaultColor;

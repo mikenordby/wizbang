@@ -15,7 +15,7 @@ MonoBehaviour:
   heroId: knight
   displayName: Knight
   description: Heavily armored warrior with bonus health and orbiting blade. Starts with 2 orbiters for close-range defense.
-  startingWeaponType: OrbiterWeapon
+  startingWeaponType: orbiting_blades
   baseMaxHealth: 150
   baseMoveSpeed: 0.85
   baseDamage: 1.2

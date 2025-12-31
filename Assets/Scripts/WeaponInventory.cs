@@ -3,59 +3,91 @@ using System.Collections.Generic;
 
 /// <summary>
 /// Manages the player's active weapon loadout.
-/// Handles adding, upgrading, and removing weapons.
+/// Uses data-driven GenericWeapon system with WeaponDefinition ScriptableObjects.
 /// </summary>
 public class WeaponInventory : MonoBehaviour
 {
     [Header("Weapon Slots")]
     [SerializeField] private int maxWeaponSlots = 6;
     [SerializeField] private List<Weapon> activeWeapons = new List<Weapon>();
-    
+
     private Player player;
-    
+
     private void Awake()
     {
         player = GetComponent<Player>();
     }
-    
+
     private void Start()
     {
-        // Starting weapon is now added by Player.InitializeWithCharacter() based on selected character
-        // No longer adding default ProjectileWeapon here
-        
         DebugLog.Info($"[WeaponInventory] Started with {activeWeapons.Count} weapon(s)");
     }
-    
+
     /// <summary>
-    /// Add a new weapon to the inventory.
+    /// Add a new weapon to the inventory by weapon ID.
+    /// Supports both new weapon IDs (e.g., "magic_missile") and legacy type names (e.g., "ProjectileWeapon").
     /// </summary>
-    public bool AddWeapon(string weaponType)
+    public bool AddWeapon(string weaponId)
     {
-        DebugLog.Verbose($"[WeaponInventory] AddWeapon called with type: {weaponType}");
+        DebugLog.Verbose($"[WeaponInventory] AddWeapon called with: {weaponId}");
+
         if (activeWeapons.Count >= maxWeaponSlots)
         {
             DebugLog.Warning($"[WeaponInventory] Cannot add weapon - inventory full ({maxWeaponSlots} slots)");
             return false;
         }
-        
-        // Check if weapon already exists
-        Weapon existingWeapon = activeWeapons.Find(w => w.GetType().Name == weaponType);
-        if (existingWeapon != null)
+
+        var db = GameServices.WeaponDefinitionDatabase;
+        if (db == null)
         {
-            // Upgrade existing weapon instead
-            existingWeapon.LevelUp();
-            DebugLog.Info($"[WeaponInventory] Upgraded existing {weaponType}");
-            return true;
-        }
-        
-        // Create new weapon dynamically
-        Weapon weapon = CreateWeapon(weaponType);
-        if (weapon == null)
-        {
-            DebugLog.Warning($"[WeaponInventory] Unknown weapon type: {weaponType}");
+            DebugLog.Error("[WeaponInventory] WeaponDefinitionDatabase not found!");
             return false;
         }
-        
+
+        // Try by ID first, then by legacy type name
+        WeaponDefinition def = db.GetByID(weaponId) ?? db.GetByLegacyType(weaponId);
+        if (def == null)
+        {
+            DebugLog.Error($"[WeaponInventory] Unknown weapon: {weaponId}");
+            return false;
+        }
+
+        return AddWeaponFromDefinition(def);
+    }
+
+    /// <summary>
+    /// Add a weapon from a WeaponDefinition.
+    /// </summary>
+    public bool AddWeaponFromDefinition(WeaponDefinition definition)
+    {
+        if (definition == null)
+        {
+            DebugLog.Warning("[WeaponInventory] Cannot add weapon: null definition");
+            return false;
+        }
+
+        if (activeWeapons.Count >= maxWeaponSlots)
+        {
+            DebugLog.Warning($"[WeaponInventory] Cannot add weapon - inventory full ({maxWeaponSlots} slots)");
+            return false;
+        }
+
+        // Check for duplicates by weapon ID
+        Weapon existingWeapon = activeWeapons.Find(w =>
+            w is GenericWeapon gw && gw.Definition?.weaponId == definition.weaponId);
+        if (existingWeapon != null)
+        {
+            DebugLog.Warning($"[WeaponInventory] Already have {definition.displayName} - cannot add duplicates");
+            return false;
+        }
+
+        // Create GenericWeapon
+        GameObject weaponObj = new GameObject(definition.displayName);
+        weaponObj.transform.SetParent(transform);
+
+        GenericWeapon weapon = weaponObj.AddComponent<GenericWeapon>();
+        weapon.Initialize(transform, player, definition);
+
         activeWeapons.Add(weapon);
         DebugLog.Info($"[WeaponInventory] Added {weapon.WeaponName} (slot {activeWeapons.Count}/{maxWeaponSlots})");
 
@@ -67,103 +99,19 @@ public class WeaponInventory : MonoBehaviour
 
         return true;
     }
-    
+
     /// <summary>
-    /// Upgrade a weapon by index.
+    /// Check if player has a weapon by ID or display name.
     /// </summary>
-    public bool UpgradeWeapon(int index)
+    public bool HasWeapon(string weaponId)
     {
-        if (index < 0 || index >= activeWeapons.Count)
-        {
-            DebugLog.Warning($"[WeaponInventory] Invalid weapon index: {index}");
-            return false;
-        }
-        
-        Weapon weapon = activeWeapons[index];
-        if (weapon.IsMaxLevel)
-        {
-            DebugLog.Warning($"[WeaponInventory] {weapon.WeaponName} is already max level");
-            return false;
-        }
-        
-        weapon.LevelUp();
-        
-        // Trigger weapon upgraded event
-        GameEvents.TriggerWeaponUpgraded(weapon, weapon.WeaponLevel);
-        
-        return true;
+        return activeWeapons.Find(w =>
+            (w is GenericWeapon gw && gw.Definition?.weaponId == weaponId) ||
+            w.WeaponName == weaponId) != null;
     }
-    
+
     /// <summary>
-    /// Upgrade a weapon by type name.
-    /// </summary>
-    public bool UpgradeWeapon(string weaponType)
-    {
-        Weapon weapon = activeWeapons.Find(w => w.GetType().Name == weaponType);
-        if (weapon == null)
-        {
-            DebugLog.Warning($"[WeaponInventory] Weapon type not found: {weaponType}");
-            return false;
-        }
-        
-        if (weapon.IsMaxLevel)
-        {
-            DebugLog.Warning($"[WeaponInventory] {weapon.WeaponName} is already max level");
-            return false;
-        }
-        
-        weapon.LevelUp();
-        DebugLog.Info($"[WeaponInventory] Upgraded {weapon.WeaponName} to level {weapon.WeaponLevel}");
-        return true;
-    }
-    
-    /// <summary>
-    /// Check if player has a weapon by type name.
-    /// </summary>
-    public bool HasWeapon(string weaponType)
-    {
-        return activeWeapons.Find(w => w.GetType().Name == weaponType) != null;
-    }
-    
-    /// <summary>
-    /// Create weapon dynamically by type.
-    /// </summary>
-    private Weapon CreateWeapon(string weaponType)
-    {
-        DebugLog.Verbose($"[WeaponInventory] CreateWeapon called with type: {weaponType}");
-        GameObject weaponObj = new GameObject(weaponType);
-        weaponObj.transform.SetParent(transform);
-        
-        Weapon weapon = weaponType switch
-        {
-            "ProjectileWeapon" => weaponObj.AddComponent<ProjectileWeapon>(),
-            "MagicMissile" => weaponObj.AddComponent<ProjectileWeapon>(),
-            "OrbiterWeapon" => weaponObj.AddComponent<OrbiterWeapon>(),
-            "RapidFireWeapon" => weaponObj.AddComponent<RapidFireWeapon>(),
-            "LightningWeapon" => weaponObj.AddComponent<LightningWeapon>(),
-            "PoisonWeapon" => weaponObj.AddComponent<PoisonWeapon>(),
-            "LaserWeapon" => weaponObj.AddComponent<LaserWeapon>(),
-            "FireRingWeapon" => weaponObj.AddComponent<FireRingWeapon>(),
-            _ => null
-        };
-        
-        if (weapon == null)
-        {
-            DebugLog.Error($"[WeaponInventory] Failed to create weapon type: {weaponType}");
-            Destroy(weaponObj);
-        }
-        else
-        {
-            DebugLog.Info($"[WeaponInventory] Weapon component created successfully: {weapon.GetType().Name}");
-            weapon.Initialize(transform, player);
-            DebugLog.Verbose($"[WeaponInventory] Weapon initialized, enabled={weapon.enabled}, gameObject.active={weapon.gameObject.activeSelf}");
-        }
-        
-        return weapon;
-    }
-    
-    /// <summary>
-    /// Get list of active weapons.
+    /// Get list of active weapons (returns copy).
     /// </summary>
     public List<Weapon> GetActiveWeapons()
     {
@@ -171,7 +119,7 @@ public class WeaponInventory : MonoBehaviour
     }
 
     /// <summary>
-    /// Get list of weapons (alias for GetActiveWeapons, used by SynergyManager)
+    /// Get list of weapons (direct reference, used by SynergyManager).
     /// </summary>
     public List<Weapon> GetWeapons()
     {
@@ -240,6 +188,72 @@ public class WeaponInventory : MonoBehaviour
 
         activeWeapons.Add(weapon);
         DebugLog.Info($"[WeaponInventory] Added {weapon.WeaponName} directly (slot {activeWeapons.Count}/{maxWeaponSlots})");
+
+        // Trigger weapon added event
+        GameEvents.TriggerWeaponAdded(weapon);
+
+        // Recalculate synergies
+        GameServices.SynergyManager?.RecalculateSynergies();
+
+        return true;
+    }
+
+    /// <summary>
+    /// Add a combined weapon with stat/tag inheritance from parent weapons.
+    /// </summary>
+    public bool AddWeaponWithInheritance(string weaponId, WeaponInheritanceData inheritanceData)
+    {
+        DebugLog.Info($"[WeaponInventory] AddWeaponWithInheritance called: {weaponId}");
+
+        if (activeWeapons.Count >= maxWeaponSlots)
+        {
+            DebugLog.Warning($"[WeaponInventory] Cannot add weapon - inventory full ({maxWeaponSlots} slots)");
+            return false;
+        }
+
+        var db = GameServices.WeaponDefinitionDatabase;
+        if (db == null)
+        {
+            DebugLog.Error("[WeaponInventory] WeaponDefinitionDatabase not found!");
+            return false;
+        }
+
+        WeaponDefinition def = db.GetByID(weaponId) ?? db.GetByLegacyType(weaponId);
+        if (def == null)
+        {
+            DebugLog.Error($"[WeaponInventory] Unknown weapon: {weaponId}");
+            return false;
+        }
+
+        return AddWeaponFromDefinitionWithInheritance(def, inheritanceData);
+    }
+
+    /// <summary>
+    /// Add a combined weapon from a definition with inheritance data.
+    /// </summary>
+    public bool AddWeaponFromDefinitionWithInheritance(WeaponDefinition definition, WeaponInheritanceData inheritanceData)
+    {
+        if (definition == null)
+        {
+            DebugLog.Warning("[WeaponInventory] Cannot add weapon: null definition");
+            return false;
+        }
+
+        if (activeWeapons.Count >= maxWeaponSlots)
+        {
+            DebugLog.Warning($"[WeaponInventory] Cannot add weapon - inventory full ({maxWeaponSlots} slots)");
+            return false;
+        }
+
+        // Create GenericWeapon with inheritance
+        GameObject weaponObj = new GameObject(definition.displayName);
+        weaponObj.transform.SetParent(transform);
+
+        GenericWeapon weapon = weaponObj.AddComponent<GenericWeapon>();
+        weapon.InitializeWithInheritance(transform, player, definition, inheritanceData);
+
+        activeWeapons.Add(weapon);
+        DebugLog.Info($"[WeaponInventory] Added combined weapon {weapon.WeaponName} (slot {activeWeapons.Count}/{maxWeaponSlots})");
 
         // Trigger weapon added event
         GameEvents.TriggerWeaponAdded(weapon);

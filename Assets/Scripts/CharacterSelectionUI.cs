@@ -361,22 +361,26 @@ public class CharacterSelectionUI : MonoBehaviour
     }
     
     /// <summary>
-    /// Helper method to get display name for weapon types with icons.
+    /// Get display name for weapon type.
+    /// Uses WeaponDefinitionDatabase for data-driven lookups.
     /// </summary>
     private string GetWeaponDisplayName(string weaponType)
     {
-        switch (weaponType)
+        var db = GameServices.WeaponDefinitionDatabase;
+        if (db == null)
         {
-            case "ProjectileWeapon": return "⚡ Magic Missile";
-            case "RapidFireWeapon": return "🔥 Rapid Fire";
-            case "BoomerangWeapon": return "🪃 Boomerang";
-            case "OrbiterWeapon": return "⭕ Orbiting Blades";
-            case "FireRingWeapon": return "🔥 Circle of Fire";
-            case "LaserWeapon": return "⚡ Piercing Laser";
-            case "LightningWeapon": return "⚡ Chain Lightning";
-            case "PoisonWeapon": return "☠️ Poison Cloud";
-            default: return weaponType;
+            DebugLog.Error($"[CharacterSelectionUI] WeaponDefinitionDatabase is NULL! Cannot get display name for: {weaponType}");
+            return weaponType;
         }
+
+        var def = db.GetByID(weaponType) ?? db.GetByLegacyType(weaponType);
+        if (def != null)
+        {
+            return def.displayName;
+        }
+
+        DebugLog.Error($"[CharacterSelectionUI] Unknown weapon type: {weaponType} - not found in WeaponDefinitionDatabase");
+        return weaponType;
     }
     
     private void OnHeroHoverExit()

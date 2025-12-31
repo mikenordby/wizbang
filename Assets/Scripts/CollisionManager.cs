@@ -12,7 +12,8 @@ public class CollisionManager : MonoBehaviour
     [SerializeField] private ProjectilePool projectilePool;
     [SerializeField] private EnemyPool enemyPool;
     [SerializeField] private OrbiterManager orbiterManager;
-    [SerializeField] private float playerCollisionRadius = 0.4f; // Match wizard body size
+    // Player collision radius is now read from Player.CollisionRadius (single source of truth)
+    private Player player;
     
     // New weapon registration system
     private List<IWeaponCollisionHandler> registeredWeapons = new List<IWeaponCollisionHandler>();
@@ -23,6 +24,9 @@ public class CollisionManager : MonoBehaviour
     
     [Tooltip("Show grid debug info in Scene view")]
     [SerializeField] private bool showGridDebug = false;
+
+    [Tooltip("Show collision hitbox circles in Scene view (red=player, yellow=enemies)")]
+    [SerializeField] private bool showHitboxGizmos = true;
     
     private float lastPlayerDamageTime = -999f;
     private float playerDamageCooldown = 0.1f; // Reduced from 0.5s - much shorter i-frames
@@ -77,71 +81,81 @@ public class CollisionManager : MonoBehaviour
         // Initialize spatial hash grid
         spatialGrid = new SpatialHashGrid(gridCellSize);
         DebugLog.Info($"[CollisionManager] Initialized spatial hash grid with cell size {gridCellSize}", "Collision");
-        
-        // Validate pool references
+
+        // Auto-find critical references if not assigned in Inspector
+        AutoFindReferences();
+    }
+
+    /// <summary>
+    /// Auto-find critical references. Called from Start() and Update() to handle late initialization.
+    /// </summary>
+    private void AutoFindReferences()
+    {
+        // Auto-find Player component and transform
+        if (player == null || playerTransform == null)
+        {
+            // First try by tag
+            GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
+            if (playerObj != null)
+            {
+                playerTransform = playerObj.transform;
+                player = playerObj.GetComponent<Player>();
+                DebugLog.Info("[CollisionManager] Auto-found Player via tag", "Collision");
+            }
+            else
+            {
+                // Try via Player component
+                player = FindFirstObjectByType<Player>();
+                if (player != null)
+                {
+                    playerTransform = player.transform;
+                    DebugLog.Info("[CollisionManager] Auto-found Player via component", "Collision");
+                }
+            }
+        }
+
+        // Auto-find ProjectilePool
         if (projectilePool == null)
         {
-            DebugLog.Error("[CollisionManager] ProjectilePool not assigned! Collision detection will not work.", "Collision");
+            projectilePool = FindFirstObjectByType<ProjectilePool>();
+            if (projectilePool != null)
+            {
+                DebugLog.Info("[CollisionManager] Auto-found ProjectilePool", "Collision");
+            }
         }
-        else
-        {
-            DebugLog.Info("[CollisionManager] ProjectilePool reference found", "Collision");
-        }
-        
+
+        // Auto-find EnemyPool
         if (enemyPool == null)
         {
-            DebugLog.Error("[CollisionManager] EnemyPool not assigned! Collision detection will not work.", "Collision");
+            enemyPool = FindFirstObjectByType<EnemyPool>();
+            if (enemyPool != null)
+            {
+                DebugLog.Info("[CollisionManager] Auto-found EnemyPool", "Collision");
+            }
         }
-        else
-        {
-            DebugLog.Info("[CollisionManager] EnemyPool reference found", "Collision");
-        }
-        
-        // Auto-find OrbiterManager if not assigned
+
+        // Auto-find OrbiterManager
         if (orbiterManager == null)
         {
             orbiterManager = GetComponent<OrbiterManager>();
-            if (orbiterManager != null)
+            if (orbiterManager == null)
             {
-                DebugLog.Info("[CollisionManager] Auto-found OrbiterManager on same GameObject", "Collision");
+                orbiterManager = FindFirstObjectByType<OrbiterManager>();
             }
         }
-        
-        // Auto-register all weapons that implement IWeaponCollisionHandler
-        if (playerTransform != null)
-        {
-            // Register OrbiterWeapon (still uses IWeaponCollisionHandler)
-            OrbiterWeapon orbiterWeapon = playerTransform.GetComponent<OrbiterWeapon>();
-            if (orbiterWeapon != null)
-            {
-                RegisterWeapon(orbiterWeapon);
-            }
-            
-            // Register FireRingWeapon (uses IWeaponCollisionHandler)
-            FireRingWeapon fireRingWeapon = playerTransform.GetComponent<FireRingWeapon>();
-            if (fireRingWeapon != null)
-            {
-                RegisterWeapon(fireRingWeapon);
-            }
-            
-            // NOTE: ProjectileWeapon and RapidFireWeapon no longer register here
-            // They now use centralized collision detection via ProcessProjectileCollisions()
-            
-            DebugLog.Info($"[CollisionManager] Registered {registeredWeapons.Count} IWeaponCollisionHandler weapons (orbiters, fire rings, etc.)", "Collision");
-        }
-        
-        DebugLog.Verbose($"[CollisionManager] Starting - orbiterManager={orbiterManager != null}, enemyPool={enemyPool != null}, projectilePool={projectilePool != null}");
-        
-        if (playerTransform != null)
+
+        // Set up player health and physics if we have playerTransform
+        if (playerTransform != null && playerHealth == null)
         {
             playerHealth = playerTransform.GetComponent<Health>();
             if (playerHealth == null)
             {
                 playerHealth = playerTransform.gameObject.AddComponent<Health>();
                 playerHealth.Initialize(30f); // 3 hits at 10 damage each
+                DebugLog.Info("[CollisionManager] Added Health component to player", "Collision");
             }
-            
-            // Add physics components for player collision and knockback
+
+            // Ensure physics components exist for knockback
             Rigidbody2D playerRb = playerTransform.GetComponent<Rigidbody2D>();
             if (playerRb != null)
             {
@@ -151,14 +165,21 @@ public class CollisionManager : MonoBehaviour
                 playerRb.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
                 playerRb.mass = 1f;
             }
-            
+
+            // Ensure collider exists and has correct radius from Player.CollisionRadius
             CircleCollider2D playerCollider = playerTransform.GetComponent<CircleCollider2D>();
             if (playerCollider == null)
             {
                 playerCollider = playerTransform.gameObject.AddComponent<CircleCollider2D>();
-                playerCollider.radius = playerCollisionRadius;
-                playerCollider.isTrigger = false;
+                DebugLog.Info($"[CollisionManager] Added CircleCollider2D to player", "Collision");
             }
+            // Use Player.CollisionRadius as single source of truth
+            float radius = player != null ? player.CollisionRadius : 0.32f;
+            playerCollider.radius = radius;
+            playerCollider.isTrigger = false;
+            DebugLog.Info($"[CollisionManager] Player CircleCollider2D radius set to {radius} (from Player.CollisionRadius)", "Collision");
+
+            // Note: Weapons with IWeaponCollisionHandler (like OrbiterBehavior) register themselves
         }
     }
 
@@ -167,25 +188,22 @@ public class CollisionManager : MonoBehaviour
     {
         // ONLY run collisions during gameplay phase
         if (GamePhaseManager.CurrentPhase != GamePhase.Gameplay) return;
-        
+
         if (gameOver || GameState.IsPaused) return;
-        
-        // Log collision manager is running
-        if (Time.frameCount % 120 == 0)
+
+        // Try to find references if missing (handles late initialization after character selection)
+        if (playerTransform == null || enemyPool == null || playerHealth == null)
         {
-            DebugLog.Verbose($"[CollisionManager.Update] Running, registeredWeapons={registeredWeapons.Count}");
+            AutoFindReferences();
         }
-        
+
+
         // Safety check - spatial grid must be initialized
         if (spatialGrid == null)
         {
             spatialGrid = new SpatialHashGrid(gridCellSize);
         }
-        
-        // Dynamic weapon registration (catches weapons added after Start)
-        // NOTE: ProjectileWeapon no longer needs registration - centralized collision in ProcessProjectileCollisions()
-        // Only register weapons that still implement IWeaponCollisionHandler (boomerangs, orbiters, etc.)
-        
+
         // Populate spatial hash grid with all entities
         PopulateSpatialGrid();
         
@@ -207,8 +225,9 @@ public class CollisionManager : MonoBehaviour
     private void PopulateSpatialGrid()
     {
         spatialGrid.Clear();
-        
+
         // Insert all enemies (using cached active list - no GC)
+        int insertedCount = 0;
         if (enemyPool != null)
         {
             List<Enemy> activeEnemies = enemyPool.GetActiveEnemies();
@@ -217,10 +236,17 @@ public class CollisionManager : MonoBehaviour
                 if (enemy != null && enemy.gameObject.activeInHierarchy && enemy.IsActive)
                 {
                     spatialGrid.Insert(enemy);
+                    insertedCount++;
                 }
             }
         }
-        
+
+        // Debug: Log insertion stats periodically
+        if (Time.frameCount % 300 == 0 && insertedCount > 0)
+        {
+            DebugLog.Info($"[CollisionManager] Populated grid with {insertedCount} enemies");
+        }
+
         // Note: We don't insert projectiles/orbiters into grid because they query enemies
         // Only enemies need to be in the grid for efficient nearest-neighbor queries
     }
@@ -264,10 +290,6 @@ public class CollisionManager : MonoBehaviour
             return;
         }
         
-        if (Time.frameCount % 120 == 0 && activeProjectiles.Count > 0)
-        {
-            DebugLog.Info($"[CollisionManager] Processing {activeProjectiles.Count} active projectiles");
-        }
         
         int totalHits = 0;
         
@@ -358,10 +380,6 @@ public class CollisionManager : MonoBehaviour
             }
         }
         
-        if (Time.frameCount % 120 == 0 && totalHits > 0)
-        {
-            DebugLog.Verbose($"[CollisionManager] Projectile collisions: {totalHits} hits");
-        }
     }
     
     /// <summary>
@@ -388,30 +406,72 @@ public class CollisionManager : MonoBehaviour
     /// </summary>
     private void CheckPlayerEnemyCollisions()
     {
-        if (playerTransform == null || enemyPool == null || playerHealth == null) return;
-        
+        // Detailed null checks with logging (more frequent for debugging)
+        if (playerTransform == null)
+        {
+            if (Time.frameCount % 60 == 0)
+                DebugLog.Warning("[CollisionManager] CheckPlayerEnemyCollisions: playerTransform is NULL! Trying to find player...");
+            AutoFindReferences();
+            return;
+        }
+        if (enemyPool == null)
+        {
+            if (Time.frameCount % 60 == 0)
+                DebugLog.Warning("[CollisionManager] CheckPlayerEnemyCollisions: enemyPool is NULL!");
+            return;
+        }
+        if (playerHealth == null)
+        {
+            if (Time.frameCount % 60 == 0)
+                DebugLog.Warning("[CollisionManager] CheckPlayerEnemyCollisions: playerHealth is NULL! Trying to get it...");
+            playerHealth = playerTransform.GetComponent<Health>();
+            if (playerHealth == null) return;
+        }
+        if (spatialGrid == null)
+        {
+            if (Time.frameCount % 60 == 0)
+                DebugLog.Warning("[CollisionManager] CheckPlayerEnemyCollisions: spatialGrid is NULL!");
+            return;
+        }
+
         // Skip if level-up UI is showing
         LevelUpUI levelUpUI = GameServices.LevelUpUI;
         if (levelUpUI != null && levelUpUI.IsShowingUI) return;
-        
+
         Rigidbody2D playerRb = playerTransform.GetComponent<Rigidbody2D>();
-        
+
         // Query spatial grid for nearby enemies
+        // CRITICAL: Use generous radius for query to catch all potential collisions
+        // Enemy collision radius now scales with their visual size (0.3 * scale)
+        // With enemy scale ~2.5, enemy radius ~0.75, so combined ~1.07
+        // Use 1.5 to ensure we catch all nearby enemies
+        float queryRadius = 1.5f;
+
         var nearbyEntities = spatialGrid.Query(
             playerTransform.position,
-            playerCollisionRadius,
+            queryRadius,
             CollisionLayer.Enemy
         );
-        
+
+        // Debug: Log query results periodically
+        if (Time.frameCount % 120 == 0)
+        {
+            int totalEnemies = enemyPool.GetActiveEnemies().Count;
+            DebugLog.Info($"[CollisionManager] Player collision check: {nearbyEntities.Count} nearby of {totalEnemies} total enemies");
+        }
+
         foreach (var entity in nearbyEntities)
         {
             if (entity is Enemy enemy && enemy.gameObject.activeInHierarchy && enemy.IsActive)
             {
                 float distance = Vector3.Distance(playerTransform.position, enemy.Position);
-                float combinedRadius = playerCollisionRadius + enemy.CollisionRadius;
-                
+                float playerRadius = player != null ? player.CollisionRadius : 0.32f;
+                float combinedRadius = playerRadius + enemy.CollisionRadius;
+
                 if (distance < combinedRadius)
                 {
+                    DebugLog.Info($"[CollisionManager] Collision! dist={distance:F2}, combined={combinedRadius:F2}, enemy={enemy.name}");
+
                     // Only apply damage if cooldown elapsed
                     if (Time.time - lastPlayerDamageTime >= playerDamageCooldown)
                     {
@@ -419,7 +479,7 @@ public class CollisionManager : MonoBehaviour
                         bool playerDied = playerHealth.TakeDamage(damage);
                         lastPlayerDamageTime = Time.time;
 
-                        DebugLog.Verbose($"Player hit by {enemy.name}! Took {damage} damage, HP: {playerHealth.CurrentHealth}/{playerHealth.MaxHealth}", "Collision");
+                        DebugLog.Verbose($"[CollisionManager] Player hit by {enemy.name}! HP: {playerHealth.CurrentHealth}/{playerHealth.MaxHealth}");
 
                         // Show red damage number above player
                         DamageNumberPool damagePool = GameServices.DamageNumberPool;
@@ -433,7 +493,6 @@ public class CollisionManager : MonoBehaviour
                         if (enemyHealth != null)
                         {
                             enemyHealth.TakeDamage(999999f); // Instant kill
-                            DebugLog.Verbose($"Enemy {enemy.name} killed after hitting player (suicide attack)", "Collision");
                         }
                         
                         if (playerDied)
@@ -490,13 +549,88 @@ public class CollisionManager : MonoBehaviour
     }
     
     /// <summary>
-    /// Draw spatial grid in Scene view for debugging
+    /// Draw spatial grid and hitboxes in Scene view for debugging
     /// </summary>
     private void OnDrawGizmos()
     {
         if (showGridDebug && spatialGrid != null)
         {
             spatialGrid.DrawGizmos();
+        }
+
+        if (showHitboxGizmos)
+        {
+            DrawHitboxGizmos();
+        }
+    }
+
+    /// <summary>
+    /// Draw collision hitboxes for player, enemies, and projectiles
+    /// </summary>
+    private void DrawHitboxGizmos()
+    {
+        // Draw player hitbox (red circle)
+        if (player != null && playerTransform != null)
+        {
+            Gizmos.color = new Color(1f, 0.2f, 0.2f, 0.8f); // Red
+            DrawCircle(playerTransform.position, player.CollisionRadius, 32);
+            // Also draw a filled center
+            Gizmos.color = new Color(1f, 0.2f, 0.2f, 0.3f);
+            Gizmos.DrawSphere(playerTransform.position, player.CollisionRadius);
+        }
+
+        // Draw enemy hitboxes (yellow circles)
+        if (enemyPool != null)
+        {
+            // Make a copy to avoid collection modified exception during gizmo drawing
+            var enemies = enemyPool.GetActiveEnemies();
+            if (enemies != null)
+            {
+                for (int i = 0; i < enemies.Count; i++)
+                {
+                    var enemy = enemies[i];
+                    if (enemy == null || !enemy.IsActive || enemy.gameObject == null) continue;
+
+                    Gizmos.color = new Color(1f, 0.9f, 0.2f, 0.6f); // Yellow
+                    DrawCircle(enemy.Position, enemy.CollisionRadius, 24);
+                }
+            }
+        }
+
+        // Draw projectile hitboxes (green circles)
+        if (projectilePool != null)
+        {
+            var projectiles = projectilePool.GetActiveProjectiles();
+            if (projectiles != null)
+            {
+                for (int i = 0; i < projectiles.Count; i++)
+                {
+                    var proj = projectiles[i];
+                    if (proj == null || !proj.IsActive || proj.gameObject == null) continue;
+
+                    Gizmos.color = new Color(0.2f, 1f, 0.2f, 0.6f); // Green
+                    DrawCircle(proj.Position, proj.CollisionRadius, 16);
+                }
+            }
+        }
+
+        // Note: AoE weapon visuals are drawn by their respective behavior classes
+    }
+
+    /// <summary>
+    /// Draw a wire circle using Gizmos.DrawLine
+    /// </summary>
+    private void DrawCircle(Vector3 center, float radius, int segments)
+    {
+        float angleStep = 360f / segments;
+        Vector3 prevPoint = center + new Vector3(radius, 0, 0);
+
+        for (int i = 1; i <= segments; i++)
+        {
+            float angle = i * angleStep * Mathf.Deg2Rad;
+            Vector3 newPoint = center + new Vector3(Mathf.Cos(angle) * radius, Mathf.Sin(angle) * radius, 0);
+            Gizmos.DrawLine(prevPoint, newPoint);
+            prevPoint = newPoint;
         }
     }
 }

@@ -37,18 +37,23 @@ public class CombinationManager : MonoBehaviour
 
     /// <summary>
     /// Load all WeaponCombination ScriptableObjects from Resources/Combinations/
+    /// Falls back to DefaultWeaponCombinations if no assets found.
     /// </summary>
     private void LoadCombinationDatabase()
     {
         WeaponCombination[] combinations = Resources.LoadAll<WeaponCombination>("Combinations");
-        if (combinations.Length == 0)
+        if (combinations.Length > 0)
         {
-            DebugLog.Warning("[CombinationManager] No combinations found in Resources/Combinations/");
+            availableCombinations.AddRange(combinations);
+            DebugLog.Info($"[CombinationManager] Loaded {combinations.Length} combinations from Resources");
         }
         else
         {
-            availableCombinations.AddRange(combinations);
-            DebugLog.Info($"[CombinationManager] Loaded {combinations.Length} combinations");
+            // Fall back to default combinations
+            DebugLog.Info("[CombinationManager] No combinations in Resources/Combinations/, using defaults");
+            var defaults = DefaultWeaponCombinations.CreateAll();
+            availableCombinations.AddRange(defaults);
+            DebugLog.Info($"[CombinationManager] Created {defaults.Count} default combinations");
         }
     }
 
@@ -73,9 +78,9 @@ public class CombinationManager : MonoBehaviour
                 Weapon weaponA = weapons[i];
                 Weapon weaponB = weapons[j];
 
-                // Get weapon type names (e.g., "ProjectileWeapon")
-                string typeA = weaponA.GetType().Name;
-                string typeB = weaponB.GetType().Name;
+                // Both weapons must be level 2+ to be eligible for combination
+                if (!weaponA.CanCombine || !weaponB.CanCombine)
+                    continue;
 
                 // Check all combination recipes
                 foreach (WeaponCombination combo in availableCombinations)
@@ -84,19 +89,13 @@ public class CombinationManager : MonoBehaviour
                     if (!IsCombinationUnlocked(combo.combinationName))
                         continue;
 
-                    // Check if weapon types match
-                    if (!combo.MatchesWeapons(typeA, typeB))
-                        continue;
-
-                    // Check level requirements
-                    int levelA = weaponA.WeaponLevel;
-                    int levelB = weaponB.WeaponLevel;
-                    if (!combo.MeetsLevelRequirements(typeA, levelA, typeB, levelB))
+                    // Check if weapons match (handles both legacy and data-driven)
+                    if (!combo.MatchesWeapons(weaponA, weaponB))
                         continue;
 
                     // Valid combination found
                     validCombinations.Add((combo, weaponA, weaponB));
-                    DebugLog.Info($"[CombinationManager] Found valid combination: {weaponA.WeaponName} + {weaponB.WeaponName} = {combo.combinationName}");
+                    DebugLog.Info($"[CombinationManager] Found valid combination: {weaponA.WeaponName} Lv.{weaponA.Level} + {weaponB.WeaponName} Lv.{weaponB.Level} = {combo.combinationName}");
                 }
             }
         }
@@ -128,7 +127,7 @@ public class CombinationManager : MonoBehaviour
 
     /// <summary>
     /// Perform weapon combination.
-    /// Removes both parent weapons and adds the combined weapon.
+    /// Removes both parent weapons and adds the combined weapon with inherited stats/tags.
     /// </summary>
     public bool CombineWeapons(WeaponCombination combination, Weapon weapon1, Weapon weapon2)
     {
@@ -146,14 +145,30 @@ public class CombinationManager : MonoBehaviour
             return false;
         }
 
+        // Verify both weapons are level 2+ (required for combination)
+        if (!weapon1.CanCombine || !weapon2.CanCombine)
+        {
+            DebugLog.Warning($"[CombinationManager] Cannot combine: Both weapons must be level 2+ (got Lv.{weapon1.Level} and Lv.{weapon2.Level})");
+            return false;
+        }
+
+        // CRITICAL: Extract parent weapon data BEFORE removing them
+        WeaponInheritanceData inheritanceData = WeaponInheritanceData.FromParents(
+            weapon1,
+            weapon2,
+            combination.tierMultiplier
+        );
+
+        DebugLog.Info($"[CombinationManager] Combining {weapon1.WeaponName} [dmg={weapon1.Damage:F1}, tags={string.Join(",", weapon1.GetTags())}] " +
+                     $"+ {weapon2.WeaponName} [dmg={weapon2.Damage:F1}, tags={string.Join(",", weapon2.GetTags())}]");
+        DebugLog.Info($"[CombinationManager] Inherited damage: {inheritanceData.GetInheritedDamage():F1}, tags: {string.Join(",", inheritanceData.GetInheritedTags())}");
+
         // Remove parent weapons
         weaponInventory.RemoveWeapon(weapon1);
         weaponInventory.RemoveWeapon(weapon2);
 
-        DebugLog.Info($"[CombinationManager] Removed {weapon1.WeaponName} and {weapon2.WeaponName}");
-
-        // Add combined weapon
-        bool success = weaponInventory.AddWeapon(combination.resultWeaponType);
+        // Add combined weapon with inheritance data
+        bool success = weaponInventory.AddWeaponWithInheritance(combination.resultWeaponType, inheritanceData);
 
         if (success)
         {

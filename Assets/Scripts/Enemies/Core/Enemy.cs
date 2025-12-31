@@ -6,6 +6,11 @@ using UnityEngine;
 /// </summary>
 public class Enemy : MonoBehaviour, ICollidable
 {
+    /// <summary>
+    /// Global speed multiplier applied to all enemies (0.4 = 60% slower for slower-paced gameplay)
+    /// </summary>
+    public static float GlobalSpeedMultiplier = 0.4f;
+
     [SerializeField] private EnemyStats stats;
     private Health health;
     private Transform playerTransform;
@@ -16,9 +21,13 @@ public class Enemy : MonoBehaviour, ICollidable
     private CircleCollider2D enemyCollider;
     private Rigidbody2D rb;
     private int currentCollisionCount = 0;
+    private bool isTouchingObstacle = false;
+    private Vector2 obstacleAvoidanceDirection = Vector2.zero;
     
     public bool IsActive => isActive;
-    public float CollisionRadius => 0.4f; // Enemy body: 64px at 64 PPU = ~0.8 diameter
+    // Collision radius scales with enemy visual size for accurate hitbox
+    // Base 0.3f * localScale gives reasonable hitbox relative to visual
+    public float CollisionRadius => 0.3f * transform.localScale.x;
     public float ContactDamage => stats != null ? stats.contactDamage : 10f;
     public int XPDrop => stats != null ? stats.xpDrop : 5;
     
@@ -33,8 +42,50 @@ public class Enemy : MonoBehaviour, ICollidable
             currentCollisionCount++;
             UpdateOutlineColor();
         }
+
+        // Track obstacle collisions (rocks) and calculate avoidance direction
+        if (collision.gameObject.GetComponent<RockObstacle>() != null)
+        {
+            isTouchingObstacle = true;
+
+            // Get collision normal and calculate perpendicular slide direction
+            if (collision.contactCount > 0)
+            {
+                Vector2 normal = collision.GetContact(0).normal;
+                // Calculate which perpendicular direction leads toward player
+                Vector2 toPlayer = (playerTransform != null)
+                    ? (Vector2)(playerTransform.position - transform.position).normalized
+                    : Vector2.zero;
+
+                // Two perpendicular options: rotate normal 90° left or right
+                Vector2 perpLeft = new Vector2(-normal.y, normal.x);
+                Vector2 perpRight = new Vector2(normal.y, -normal.x);
+
+                // Choose the one that points more toward the player
+                obstacleAvoidanceDirection = Vector2.Dot(perpLeft, toPlayer) > Vector2.Dot(perpRight, toPlayer)
+                    ? perpLeft : perpRight;
+            }
+        }
     }
-    
+
+    private void OnCollisionStay2D(Collision2D collision)
+    {
+        // Continuously update avoidance direction while touching obstacle
+        if (collision.gameObject.GetComponent<RockObstacle>() != null && collision.contactCount > 0)
+        {
+            Vector2 normal = collision.GetContact(0).normal;
+            Vector2 toPlayer = (playerTransform != null)
+                ? (Vector2)(playerTransform.position - transform.position).normalized
+                : Vector2.zero;
+
+            Vector2 perpLeft = new Vector2(-normal.y, normal.x);
+            Vector2 perpRight = new Vector2(normal.y, -normal.x);
+
+            obstacleAvoidanceDirection = Vector2.Dot(perpLeft, toPlayer) > Vector2.Dot(perpRight, toPlayer)
+                ? perpLeft : perpRight;
+        }
+    }
+
     private void OnCollisionExit2D(Collision2D collision)
     {
         if (collision.gameObject.GetComponent<Enemy>() != null)
@@ -42,6 +93,13 @@ public class Enemy : MonoBehaviour, ICollidable
             currentCollisionCount--;
             if (currentCollisionCount < 0) currentCollisionCount = 0;
             UpdateOutlineColor();
+        }
+
+        // Track obstacle collisions (rocks)
+        if (collision.gameObject.GetComponent<RockObstacle>() != null)
+        {
+            isTouchingObstacle = false;
+            obstacleAvoidanceDirection = Vector2.zero;
         }
     }
     
@@ -69,82 +127,7 @@ public class Enemy : MonoBehaviour, ICollidable
     {
         playerTransform = player;
     }
-    
-    /// <summary>
-    /// Initialize the enemy with player reference and stats
-    /// </summary>
-    public void Initialize(Transform player, EnemyStats enemyStats)
-    {
-        playerTransform = player;
-        stats = enemyStats;
-        
-        spriteRenderer = GetComponent<SpriteRenderer>();
-        health = GetComponent<Health>();
-        if (health == null)
-            health = gameObject.AddComponent<Health>();
-        
-        // Add CircleCollider2D for enemy-enemy collision
-        enemyCollider = GetComponent<CircleCollider2D>();
-        if (enemyCollider == null)
-        {
-            enemyCollider = gameObject.AddComponent<CircleCollider2D>();
-            enemyCollider.radius = 0.5f; // Larger radius to prevent overlap (64px sprite = 1.0 unit, so 0.5 is half)
-            enemyCollider.isTrigger = false; // Physical collision enabled - enemies push each other
-        }
-        
-        // Add Rigidbody2D for physics
-        rb = GetComponent<Rigidbody2D>();
-        if (rb == null)
-        {
-            rb = gameObject.AddComponent<Rigidbody2D>();
-            rb.bodyType = RigidbodyType2D.Dynamic;
-            rb.gravityScale = 0f;
-            rb.constraints = RigidbodyConstraints2D.FreezeRotation;
-            rb.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
-            rb.mass = 0.5f; // Low mass so enemies don't stack heavily
-            rb.linearDamping = 3f; // High damping to slow them down quickly after collision
-        }
-        
-        // Ensure enemies are on Default layer (0) which should collide with Obstacles layer
-        // If enemies are on a custom layer, make sure it's set to collide with Obstacles in Physics2D settings
-        if (gameObject.layer == 0) // Default layer
-        {
-            // Keep on Default layer - this should collide with everything including Obstacles
-        }
-        
-        if (spriteRenderer != null && spriteRenderer.sprite == null)
-        {
-            DebugLog.Warning($"Enemy.Initialize: Sprite is null, attempting to load from SpriteLoader for {stats?.enemyName}");
-            if (stats != null)
-            {
-                spriteRenderer.sprite = SpriteLoader.LoadEnemySprite(stats.enemyName, stats.color);
-                if (spriteRenderer.sprite != null)
-                {
-                    DebugLog.Info($"Enemy.Initialize: Loaded sprite for {stats.enemyName}: {spriteRenderer.sprite.texture.width}x{spriteRenderer.sprite.texture.height}px");
-                }
-                else
-                {
-                    DebugLog.Error($"Enemy.Initialize: Failed to load sprite for {stats.enemyName}, using fallback");
-                    Texture2D texture = new Texture2D(64, 64);
-                    Color[] pixels = new Color[64 * 64];
-                    for (int i = 0; i < pixels.Length; i++)
-                        pixels[i] = Color.white;
-                    texture.SetPixels(pixels);
-                    texture.Apply();
-                    spriteRenderer.sprite = Sprite.Create(texture, new Rect(0, 0, 64, 64), new Vector2(0.5f, 0.5f), 64);
-                }
-            }
-        }
-        
-        if (stats != null && spriteRenderer != null)
-        {
-            spriteRenderer.color = stats.color;
-            transform.localScale = Vector3.one * stats.scale;
-        }
-        
-        health.OnDeath += HandleDeath;
-    }
-    
+
     /// <summary>
     /// Activate enemy at a specific position with stats
     /// </summary>
@@ -155,23 +138,53 @@ public class Enemy : MonoBehaviour, ICollidable
     {
         stats = enemyStats;
         transform.position = position;
-        
+        isTouchingObstacle = false;
+        obstacleAvoidanceDirection = Vector2.zero;
+
         // Lazy initialization if not already done
         if (spriteRenderer == null)
             spriteRenderer = GetComponent<SpriteRenderer>();
-        
+
         if (playerTransform == null)
         {
             GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
             if (playerObj != null)
                 playerTransform = playerObj.transform;
         }
-        
+
         if (health == null)
             health = GetComponent<Health>();
         if (health == null)
             health = gameObject.AddComponent<Health>();
-        
+
+        // CRITICAL: Ensure physics components exist for enemy-enemy collision
+        // This was previously in Initialize() which was never called
+        if (enemyCollider == null)
+        {
+            enemyCollider = GetComponent<CircleCollider2D>();
+            if (enemyCollider == null)
+            {
+                enemyCollider = gameObject.AddComponent<CircleCollider2D>();
+                enemyCollider.radius = 0.15f; // Very tight hitbox - 50% smaller diameter for dense enemy packs
+                enemyCollider.isTrigger = false; // Physical collision enabled - enemies push each other
+            }
+        }
+
+        if (rb == null)
+        {
+            rb = GetComponent<Rigidbody2D>();
+            if (rb == null)
+            {
+                rb = gameObject.AddComponent<Rigidbody2D>();
+                rb.bodyType = RigidbodyType2D.Dynamic;
+                rb.gravityScale = 0f;
+                rb.constraints = RigidbodyConstraints2D.FreezeRotation;
+                rb.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
+                rb.mass = 0.5f; // Low mass so enemies don't stack heavily
+                rb.linearDamping = 0.5f; // Lower damping allows natural sliding around obstacles
+            }
+        }
+
         // Subscribe to death event if not already subscribed
         health.OnDeath -= HandleDeath; // Remove first to avoid duplicates
         health.OnDeath += HandleDeath;
@@ -247,18 +260,22 @@ public class Enemy : MonoBehaviour, ICollidable
     public void Deactivate()
     {
         DebugLog.Verbose($"[Enemy.Deactivate] {stats?.enemyName} being deactivated and returned to pool");
-        
+
         isActive = false;
         currentCollisionCount = 0;
         if (spriteRenderer != null)
             spriteRenderer.color = Color.white;
-        
+
+        // CRITICAL: Reset velocity to prevent residual movement when pooled/reactivated
+        if (rb != null)
+            rb.linearVelocity = Vector2.zero;
+
         // CRITICAL: Stop animation to prevent stuck frames when pooled enemy is reactivated
         if (animController != null)
         {
             animController.Stop();
         }
-        
+
         gameObject.SetActive(false);
         
         // Notify pool to remove from active list (failsafe)
@@ -315,32 +332,39 @@ public class Enemy : MonoBehaviour, ICollidable
     {
         if (GamePhaseManager.CurrentPhase != GamePhase.Gameplay) return;
         if (GameState.IsPaused) return;
-        
+
         if (!isActive || playerTransform == null)
         {
             return;
         }
-        
-        // Move toward player using Rigidbody2D for proper physics collision
+
+        // Move toward player
         Vector3 direction = (playerTransform.position - transform.position).normalized;
-        float speed = stats != null ? stats.moveSpeed : 2f;
-        
+        float speed = (stats != null ? stats.moveSpeed : 2f) * GlobalSpeedMultiplier;
+
         // Update animation direction using AnimatedSpriteController
         if (animController != null && animController.IsPlaying)
         {
-            Vector2 moveDirection = direction;
-            animController.UpdateDirection(moveDirection);
+            animController.UpdateDirection(direction);
         }
-        
-        // Use Rigidbody2D.MovePosition for physics-aware movement
+
         if (rb != null)
         {
-            Vector2 newPosition = rb.position + (Vector2)(direction * speed * Time.deltaTime);
-            rb.MovePosition(newPosition);
+            // When touching an obstacle, slide along it using the calculated avoidance direction
+            if (isTouchingObstacle && obstacleAvoidanceDirection != Vector2.zero)
+            {
+                // Blend between sliding along obstacle and moving toward player
+                Vector2 slideDirection = (obstacleAvoidanceDirection + (Vector2)direction * 0.3f).normalized;
+                rb.linearVelocity = slideDirection * speed;
+            }
+            else
+            {
+                // Not blocked - move directly toward player
+                rb.linearVelocity = (Vector2)direction * speed;
+            }
         }
         else
         {
-            // Fallback if no Rigidbody2D (shouldn't happen)
             transform.position += direction * speed * Time.deltaTime;
         }
     }

@@ -18,7 +18,7 @@ public class RockSpawner : MonoBehaviour
     [SerializeField] private int chunkSize = 20;
     
     [Tooltip("How far from player before despawning")]
-    [SerializeField] private float despawnDistance = 35f;
+    [SerializeField] private float despawnDistance = 49f;
     
     [Header("Rock Properties")]
     [Tooltip("Rock size in world units")]

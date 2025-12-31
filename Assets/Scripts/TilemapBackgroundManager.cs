@@ -56,60 +56,29 @@ public class TilemapBackgroundManager : MonoBehaviour
     }
     
     /// <summary>
-    /// Load tileset sprites from Resources and extract pure terrain tiles
+    /// Load tileset sprites from Resources and create terrain tiles
     /// </summary>
     private void LoadAndCreateTiles()
     {
         DebugLog.Info("[TilemapBackgroundManager] Loading terrain tile sprites from Resources...");
-        
-        // Try to load PixelLab-generated terrain tiles
+
+        // Load PixelLab-generated terrain tiles
         Sprite grassSprite = Resources.Load<Sprite>("Sprites/Backgrounds/terrain_grass");
         Sprite dirtSprite = Resources.Load<Sprite>("Sprites/Backgrounds/terrain_dirt");
         Sprite stoneSprite = Resources.Load<Sprite>("Sprites/Backgrounds/terrain_stone");
         Sprite desertSprite = Resources.Load<Sprite>("Sprites/Backgrounds/terrain_desert");
-        
-        // Use PixelLab sprites if available, otherwise use solid colors
-        if (grassSprite != null)
-        {
-            pureGrassTile = CreateTileFromSprite(grassSprite, "GrassTile");
-            DebugLog.Info("[TilemapBackgroundManager] Using PixelLab grass tile");
-        }
-        else
-        {
-            pureGrassTile = CreateColoredTile(new Color(0.35f, 0.65f, 0.25f), "PureGrass");
-        }
-        
-        if (dirtSprite != null)
-        {
-            pureDirtTile = CreateTileFromSprite(dirtSprite, "DirtTile");
-            DebugLog.Info("[TilemapBackgroundManager] Using PixelLab dirt tile");
-        }
-        else
-        {
-            pureDirtTile = CreateColoredTile(new Color(0.4f, 0.25f, 0.15f), "PureDirt");
-        }
-        
-        if (stoneSprite != null)
-        {
-            pureStoneTile = CreateTileFromSprite(stoneSprite, "StoneTile");
-            DebugLog.Info("[TilemapBackgroundManager] Using PixelLab stone tile");
-        }
-        else
-        {
-            pureStoneTile = CreateColoredTile(new Color(0.55f, 0.5f, 0.45f), "PureStone");
-        }
-        
-        if (desertSprite != null)
-        {
-            pureDesertTile = CreateTileFromSprite(desertSprite, "DesertTile");
-            DebugLog.Info("[TilemapBackgroundManager] Using PixelLab desert tile");
-        }
-        else
-        {
-            pureDesertTile = CreateColoredTile(new Color(0.75f, 0.65f, 0.4f), "PureDesert");
-        }
-        
-        DebugLog.Info("[TilemapBackgroundManager] Terrain tiles loaded successfully");
+
+        if (grassSprite == null) DebugLog.Error("[TilemapBackgroundManager] MISSING SPRITE: Sprites/Backgrounds/terrain_grass");
+        if (dirtSprite == null) DebugLog.Error("[TilemapBackgroundManager] MISSING SPRITE: Sprites/Backgrounds/terrain_dirt");
+        if (stoneSprite == null) DebugLog.Error("[TilemapBackgroundManager] MISSING SPRITE: Sprites/Backgrounds/terrain_stone");
+        if (desertSprite == null) DebugLog.Error("[TilemapBackgroundManager] MISSING SPRITE: Sprites/Backgrounds/terrain_desert");
+
+        pureGrassTile = grassSprite != null ? CreateTileFromSprite(grassSprite, "GrassTile") : null;
+        pureDirtTile = dirtSprite != null ? CreateTileFromSprite(dirtSprite, "DirtTile") : null;
+        pureStoneTile = stoneSprite != null ? CreateTileFromSprite(stoneSprite, "StoneTile") : null;
+        pureDesertTile = desertSprite != null ? CreateTileFromSprite(desertSprite, "DesertTile") : null;
+
+        DebugLog.Info("[TilemapBackgroundManager] Terrain tiles loaded");
     }
     
     /// <summary>
@@ -159,45 +128,6 @@ public class TilemapBackgroundManager : MonoBehaviour
         // Create Unity Tile
         Tile tile = ScriptableObject.CreateInstance<Tile>();
         tile.sprite = tileSprite;
-        tile.name = tileName;
-        return tile;
-    }
-    
-    /// <summary>
-    /// Create fallback colored tiles matching Wang tileset colors
-    /// </summary>
-    private void CreateFallbackTiles()
-    {
-        DebugLog.Info("[TilemapBackgroundManager] Creating solid color terrain tiles");
-        
-        // Colors sampled from the actual Wang tilesets
-        pureDirtTile = CreateColoredTile(new Color(0.4f, 0.25f, 0.15f), "PureDirt");       // Rich brown dirt
-        pureGrassTile = CreateColoredTile(new Color(0.35f, 0.65f, 0.25f), "PureGrass");   // Vibrant grass green
-        pureStoneTile = CreateColoredTile(new Color(0.55f, 0.5f, 0.45f), "PureStone");    // Gray stone
-        pureDesertTile = CreateColoredTile(new Color(0.75f, 0.65f, 0.4f), "PureDesert");   // Sandy tan
-    }
-    
-    /// <summary>
-    /// Create a simple colored tile
-    /// </summary>
-    private TileBase CreateColoredTile(Color color, string tileName)
-    {
-        // Create a simple 32x32 colored texture
-        Texture2D texture = new Texture2D(32, 32);
-        texture.filterMode = FilterMode.Point;
-        
-        Color[] pixels = new Color[32 * 32];
-        for (int i = 0; i < pixels.Length; i++)
-        {
-            pixels[i] = color;
-        }
-        texture.SetPixels(pixels);
-        texture.Apply();
-        
-        Sprite sprite = Sprite.Create(texture, new Rect(0, 0, 32, 32), new Vector2(0.5f, 0.5f), 32);
-        
-        Tile tile = ScriptableObject.CreateInstance<Tile>();
-        tile.sprite = sprite;
         tile.name = tileName;
         return tile;
     }

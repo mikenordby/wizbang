@@ -24,7 +24,20 @@ public class Player : MonoBehaviour, ICollidable
     [SerializeField] private int maxWeaponSlots = 4;
     [SerializeField] private int bonusPierce = 0;
     [SerializeField] private int bonusProjectiles = 0;
-    
+
+    [Header("Global Item Modifiers")]
+    [Tooltip("Global damage multiplier from items (1.0 = no bonus, 1.10 = +10%)")]
+    public float GlobalDamageMultiplier = 1f;
+
+    [Tooltip("Global attack speed multiplier from items (1.0 = no bonus, 1.15 = +15%)")]
+    public float GlobalAttackSpeedMultiplier = 1f;
+
+    [Tooltip("Global critical strike chance from items (0.0 to 1.0, e.g. 0.10 = 10% crit)")]
+    public float GlobalCritChance = 0f;
+
+    [Tooltip("Global critical damage multiplier from items (2.0 = double damage on crit, 2.5 = 2.5x on crit)")]
+    public float GlobalCritDamage = 2f;
+
     [Header("Runtime Statistics")]
     [SerializeField] private int enemiesKilled = 0;
     [SerializeField] private float damageDealt = 0f;
@@ -34,7 +47,7 @@ public class Player : MonoBehaviour, ICollidable
     
     // ICollidable implementation
     public Vector3 Position => transform.position;
-    public float CollisionRadius => 0.4f;
+    public float CollisionRadius => 0.32f; // 20% smaller than original 0.4f
     public bool IsActive => true;
     public CollisionLayer Layer => CollisionLayer.Player;
     
@@ -44,24 +57,24 @@ public class Player : MonoBehaviour, ICollidable
     public int XPToNextLevel => xpToNextLevel;
     public float XPProgress => (float)currentXP / xpToNextLevel;
     
-    // Combat stats (base from HeroDefinition + modifiers from HeroStats)
-    public float DamageMultiplier => heroDefinition != null && stats != null 
-        ? stats.GetFinalValue(StatType.Damage, heroDefinition.baseDamage) 
-        : 1f;
-    
-    public float AttackSpeedMultiplier => heroDefinition != null && stats != null 
-        ? stats.GetFinalValue(StatType.AttackSpeed, heroDefinition.baseAttackSpeed) 
-        : 1f;
-    
+    // Combat stats (base from HeroDefinition + modifiers from HeroStats + global item multipliers)
+    public float DamageMultiplier => heroDefinition != null && stats != null
+        ? stats.GetFinalValue(StatType.Damage, heroDefinition.baseDamage) * GlobalDamageMultiplier
+        : GlobalDamageMultiplier;
+
+    public float AttackSpeedMultiplier => heroDefinition != null && stats != null
+        ? stats.GetFinalValue(StatType.AttackSpeed, heroDefinition.baseAttackSpeed) * GlobalAttackSpeedMultiplier
+        : GlobalAttackSpeedMultiplier;
+
     public float ProjectileSpeedMultiplier => 1f; // TODO: Add to HeroDefinition if needed
-    
-    public float CritChance => heroDefinition != null && stats != null 
-        ? stats.GetFinalValue(StatType.CritChance, heroDefinition.baseCritChance) 
-        : 0f;
-    
-    public float CritDamage => heroDefinition != null && stats != null 
-        ? stats.GetFinalValue(StatType.CritDamage, heroDefinition.baseCritDamage) 
-        : 2f;
+
+    public float CritChance => heroDefinition != null && stats != null
+        ? stats.GetFinalValue(StatType.CritChance, heroDefinition.baseCritChance) + GlobalCritChance
+        : GlobalCritChance;
+
+    public float CritDamage => heroDefinition != null && stats != null
+        ? stats.GetFinalValue(StatType.CritDamage, heroDefinition.baseCritDamage) + (GlobalCritDamage - 2f)
+        : GlobalCritDamage;
     
     // Defensive stats
     public float DamageReduction => stats != null 
@@ -195,7 +208,10 @@ public class Player : MonoBehaviour, ICollidable
         GameEvents.OnEnemyKilled += OnEnemyKilledHandler;
         
         isInitialized = true;
-        
+
+        // Register with GameServices so other systems can find us
+        GameServices.RegisterPlayer(this);
+
         DebugLog.Info($"Player.InitializeWithHero: {hero.displayName} ready! Level {currentLevel}, XP {currentXP}/{xpToNextLevel}");
     }
     
@@ -469,15 +485,53 @@ public class Player : MonoBehaviour, ICollidable
         }
     }
     
-    public void AddLifestealChance(float amount) 
-    { 
+    public void AddLifestealChance(float amount)
+    {
         if (stats != null)
         {
             stats.AddFlatBonus(StatType.Lifesteal, amount);
             DebugLog.Info($"[Player] Lifesteal Chance: {LifestealChance * 100:F1}% (+{amount * 100:F0}%)");
         }
     }
-    
+
+    public void AddBonusProjectiles(int amount)
+    {
+        if (stats != null)
+        {
+            stats.AddFlatBonus(StatType.ProjectileCount, amount);
+            DebugLog.Info($"[Player] Bonus Projectiles: {BonusProjectiles} (+{amount})");
+
+            // Recalculate weapon stats to apply new projectile count
+            WeaponInventory inventory = GetComponent<WeaponInventory>();
+            if (inventory != null)
+            {
+                foreach (var weapon in inventory.GetWeapons())
+                {
+                    weapon.RecalculateStats();
+                }
+            }
+        }
+    }
+
+    public void RemoveBonusProjectiles(int amount)
+    {
+        if (stats != null)
+        {
+            stats.AddFlatBonus(StatType.ProjectileCount, -amount);
+            DebugLog.Info($"[Player] Bonus Projectiles: {BonusProjectiles} (-{amount})");
+
+            // Recalculate weapon stats
+            WeaponInventory inventory = GetComponent<WeaponInventory>();
+            if (inventory != null)
+            {
+                foreach (var weapon in inventory.GetWeapons())
+                {
+                    weapon.RecalculateStats();
+                }
+            }
+        }
+    }
+
     /// <summary>
     /// Get debug string of all active stat bonuses
     /// </summary>

@@ -10,7 +10,7 @@ public enum Direction
 
 public class PlayerMovement : MonoBehaviour
 {
-    [SerializeField] private float moveSpeed = 5f;
+    [SerializeField] private float moveSpeed = 0.5f; // Much slower for strategic gameplay
     
     private Rigidbody2D rb;
     private Vector2 moveInput;
@@ -134,5 +134,14 @@ private void Update()
         // This is already handled by Player.MoveSpeedMultiplier
         // This method exists for explicit initialization calls if needed
         DebugLog.Info($"[PlayerMovement] Move speed modifier set to {modifier:F2}x (applied via Player.MoveSpeedMultiplier)");
+    }
+
+    /// <summary>
+    /// Get current movement velocity.
+    /// Used by weapons for movement-direction aiming.
+    /// </summary>
+    public Vector2 GetCurrentVelocity()
+    {
+        return rb != null ? rb.linearVelocity : Vector2.zero;
     }
 }

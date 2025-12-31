@@ -7,9 +7,9 @@ using UnityEngine;
 public class EnemySpawner : MonoBehaviour
 {
     [Header("Spawn Settings")]
-    [SerializeField] private float baseSpawnInterval = 0.5f; // Starting: 2 per second
+    [SerializeField] private float baseSpawnInterval = 0.25f; // Starting: 4 per second (doubled for slower-paced gameplay)
     [SerializeField] private float minSpawnInterval = 0.05f; // Cap at 20 per second
-    [SerializeField] private float spawnDistanceFromCamera = 12f; // Just outside view
+    [SerializeField] private float spawnBufferDistance = 3f; // How far outside camera view to spawn (in world units)
     
     [Header("References")]
     [SerializeField] private EnemyPool enemyPool;
@@ -18,7 +18,7 @@ public class EnemySpawner : MonoBehaviour
     
     [Header("Cleanup")]
     [SerializeField] private float cleanupInterval = 5f; // Check for distant enemies
-    [SerializeField] private float maxEnemyDistance = 60f; // Deactivate if beyond this (increased from 30)
+    [SerializeField] private float maxEnemyDistance = 84f; // Deactivate if beyond this (scaled for 1.4x larger camera)
     
     private float spawnTimer;
     private float cleanupTimer;
@@ -115,41 +115,49 @@ public class EnemySpawner : MonoBehaviour
     
     private Vector3 GetSpawnPositionOutsideView()
     {
+        // Calculate actual camera bounds based on orthographic size and aspect ratio
+        float camHalfHeight = mainCamera != null ? mainCamera.orthographicSize : 7f;
+        float camHalfWidth = mainCamera != null ? mainCamera.orthographicSize * mainCamera.aspect : 12f;
+
+        // Spawn distance = camera edge + buffer
+        float spawnDistanceY = camHalfHeight + spawnBufferDistance;
+        float spawnDistanceX = camHalfWidth + spawnBufferDistance;
+
         int edge = Random.Range(0, 4);
         Vector3 spawnPos = player.position;
-        
+
         switch (edge)
         {
             case 0: // Top
                 spawnPos += new Vector3(
-                    Random.Range(-spawnDistanceFromCamera, spawnDistanceFromCamera),
-                    spawnDistanceFromCamera,
+                    Random.Range(-spawnDistanceX, spawnDistanceX),
+                    spawnDistanceY,
                     0f
                 );
                 break;
             case 1: // Bottom
                 spawnPos += new Vector3(
-                    Random.Range(-spawnDistanceFromCamera, spawnDistanceFromCamera),
-                    -spawnDistanceFromCamera,
+                    Random.Range(-spawnDistanceX, spawnDistanceX),
+                    -spawnDistanceY,
                     0f
                 );
                 break;
             case 2: // Left
                 spawnPos += new Vector3(
-                    -spawnDistanceFromCamera,
-                    Random.Range(-spawnDistanceFromCamera, spawnDistanceFromCamera),
+                    -spawnDistanceX,
+                    Random.Range(-spawnDistanceY, spawnDistanceY),
                     0f
                 );
                 break;
             case 3: // Right
                 spawnPos += new Vector3(
-                    spawnDistanceFromCamera,
-                    Random.Range(-spawnDistanceFromCamera, spawnDistanceFromCamera),
+                    spawnDistanceX,
+                    Random.Range(-spawnDistanceY, spawnDistanceY),
                     0f
                 );
                 break;
         }
-        
+
         return spawnPos;
     }
     

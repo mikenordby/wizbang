@@ -38,13 +38,24 @@ public class GameState : MonoBehaviour
     
     /// <summary>
     /// Set pause state. Call this from LevelUpUI or pause menus.
+    /// Uses Time.timeScale = 0 for true game freeze (best practice).
+    /// UI animations can use Time.unscaledDeltaTime to continue during pause.
     /// </summary>
     public static void SetPaused(bool paused)
     {
         if (instance != null)
         {
             instance.isPaused = paused;
-            DebugLog.Info($"GameState: Game {(paused ? "PAUSED" : "RESUMED")}");
+
+            // Best practice: Use Time.timeScale for genuine game freeze
+            // This stops physics, animations, and all Time.deltaTime-based updates
+            // UI that needs to animate during pause should use Time.unscaledDeltaTime
+            Time.timeScale = paused ? 0f : 1f;
+
+            DebugLog.Info($"GameState: Game {(paused ? "PAUSED (timeScale=0)" : "RESUMED (timeScale=1)")}");
+
+            // Fire event for systems that need to know about pause state changes
+            GameEvents.TriggerGamePaused(paused);
         }
     }
     
@@ -69,7 +80,8 @@ public class GameState : MonoBehaviour
         {
             instance.isPaused = false;
             instance.isGameOver = false;
-            DebugLog.Info("GameState: Reset");
+            Time.timeScale = 1f; // Ensure game is running
+            DebugLog.Info("GameState: Reset (timeScale=1)");
         }
     }
 }

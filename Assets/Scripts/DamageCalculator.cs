@@ -93,5 +93,6 @@ public enum DamageType
     Fire,       // Future: Applies burn, bonus vs burning enemies
     Poison,     // Future: Applies poison DoT
     Ice,        // Future: Applies slow
-    Lightning   // Future: Chain damage to nearby enemies
+    Lightning,  // Future: Chain damage to nearby enemies
+    Arcane      // Magical damage (Magic Missile, etc.)
 }

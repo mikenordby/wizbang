@@ -1,0 +1,12 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!797 &1
+ScriptExecutionOrder:
+  m_ObjectHideFlags: 0
+  m_ExecutionOrder:
+  - m_Script: {fileID: 11500000, guid: 67860fb06dc425c4e9c64020a2bcc87f, type: 3}
+    m_ClassName: GameBootstrap
+    m_Namespace: 
+    m_AssemblyName: Assembly-CSharp
+    m_IsEditorScript: 0
+    time: -1000

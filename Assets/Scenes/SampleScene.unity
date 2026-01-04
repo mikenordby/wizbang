@@ -319,9 +319,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3369935bff8d252419c3f60e874a5c8e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BackgroundSetup
-  autoSetupOnStart: 1
-  grassColor1: {r: 0.4, g: 0.7, b: 0.3, a: 1}
-  grassColor2: {r: 0.35, g: 0.6, b: 0.25, a: 1}
 --- !u!4 &104577937
 Transform:
   m_ObjectHideFlags: 0
@@ -543,7 +540,6 @@ MonoBehaviour:
   tilemap: {fileID: 0}
   worldWidth: 100
   worldHeight: 100
-  noiseScale: 0.1
 --- !u!156049354 &252739090
 Grid:
   m_ObjectHideFlags: 0
@@ -902,6 +898,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 45630cac3f26f964291b318fa3f60381, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LevelUpUI
+  upgradeOptionPrefab: {fileID: 0}
 --- !u!1 &1085847303
 GameObject:
   m_ObjectHideFlags: 0
@@ -1022,6 +1019,7 @@ GameObject:
   - component: {fileID: 1104301250}
   - component: {fileID: 1104301251}
   - component: {fileID: 1104301252}
+  - component: {fileID: 1104301253}
   m_Layer: 0
   m_Name: Player
   m_TagString: Player
@@ -1169,25 +1167,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ea9a71796449fdb47810417083f8f611, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Player
+  heroDefinition: {fileID: 0}
   currentLevel: 1
   currentXP: 0
-  damageMultiplier: 1
-  attackSpeedMultiplier: 1
-  projectileSpeedMultiplier: 1
-  critChance: 0
-  critDamage: 2
-  damageReduction: 0
-  maxHealthMultiplier: 1
-  healthRegen: 0
-  moveSpeedMultiplier: 1
-  xpMagnetRange: 2
-  pickupRadius: 0.5
-  luck: 0
   maxWeaponSlots: 4
   bonusPierce: 0
   bonusProjectiles: 0
-  aoeMultiplier: 1
-  rangeMultiplier: 1
   enemiesKilled: 0
   damageDealt: 0
   damageTaken: 0
@@ -1205,6 +1190,18 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::WeaponInventory
   maxWeaponSlots: 6
   activeWeapons: []
+--- !u!114 &1104301253
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1104301245}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b3dd03bd60ed46a46ba3df9b1640973d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SynergyManager
 --- !u!1 &1137520018
 GameObject:
   m_ObjectHideFlags: 0
@@ -1234,11 +1231,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 04469fa0f1fc0e64ba177b2c651c3dd0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CollisionDebugVisualizer
-  showCollisionRadii: 1
-  playerColor: {r: 0, g: 1, b: 1, a: 1}
-  enemyColor: {r: 1, g: 0, b: 0, a: 1}
-  projectileColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
-  orbiterColor: {r: 1, g: 0, b: 1, a: 1}
 --- !u!4 &1137520020
 Transform:
   m_ObjectHideFlags: 0
@@ -1249,6 +1241,52 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1202574388
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1202574390}
+  - component: {fileID: 1202574389}
+  m_Layer: 0
+  m_Name: GameObject
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1202574389
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1202574388}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5524259b9d566dd4f99ce6b0f7c633e7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SynergyUI
+  fontSize: 18
+  synergyTextColor: {r: 0, g: 1, b: 1, a: 1}
+--- !u!4 &1202574390
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1202574388}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -5.83052, y: 2.46974, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1328,7 +1366,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 12f4437a0cc273644b32a0575efb0716, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Projectile
-  collisionRadius: 0.15
+  baseCollisionRadius: 0.15
   baseSpeed: 8
   lifetime: 10
 --- !u!212 &1414351061
@@ -1543,11 +1581,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0e09dc060c0c40d4686069980f6061e3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ProjectileSpawner
-  enableAutoFire: 0
-  playerTransform: {fileID: 1104301249}
-  projectilePool: {fileID: 1508885885}
-  enemyPool: {fileID: 1508885880}
-  fireRate: 1
 --- !u!114 &1508885887
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1715,7 +1748,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7cd8f9c151f30af4faf37168b3416099, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CharacterSelectionUI
-  availableCharacters: []
+  characterCardPrefab: {fileID: 0}
+  availableHeroes: []
+  unlockedHeroIds:
+  - wizard
+  - knight
 --- !u!1 &2129940002
 GameObject:
   m_ObjectHideFlags: 0
@@ -1746,11 +1783,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ed4e3fc030c2a0f459bba7d7192fa481, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::OrbiterProjectile
-  collisionRadius: 0.15
+  baseCollisionRadius: 0.15
   orbitRadius: 2
   orbitSpeed: 2
   respawnDelay: 1
-  hitCooldown: 0.5
 --- !u!212 &2129940004
 SpriteRenderer:
   serializedVersion: 2
@@ -1849,3 +1885,4 @@ SceneRoots:
   - {fileID: 104577937}
   - {fileID: 252739091}
   - {fileID: 550511738}
+  - {fileID: 1202574390}

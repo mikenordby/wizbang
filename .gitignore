@@ -144,3 +144,11 @@ sysinfo.txt
 
 .idea/
 *.sln.iml
+
+###
+# Custom (Agent Logs, Python)
+###
+
+AgentLogs/
+*.pyc
+__pycache__/

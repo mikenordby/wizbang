@@ -15,7 +15,7 @@ MonoBehaviour:
   heroId: wizard
   displayName: Wizard
   description: Balanced hero with standard magical abilities. Good all-around starter character.
-  startingWeaponType: ProjectileWeapon
+  startingWeaponType: magic_missile
   baseMaxHealth: 100
   baseMoveSpeed: 1
   baseDamage: 1

@@ -1,0 +1,124 @@
+# Unity Project - Cross-Platform Line Endings Configuration
+# This ensures consistent line endings across Windows, Mac, and Linux
+
+# Auto-detect text files and normalize line endings to LF
+* text=auto eol=lf
+
+# Unity-specific files - always LF
+*.meta text eol=lf
+*.unity text eol=lf
+*.prefab text eol=lf
+*.asset text eol=lf
+*.mat text eol=lf
+*.controller text eol=lf
+*.anim text eol=lf
+*.overrideController text eol=lf
+*.physicMaterial text eol=lf
+*.physicsMaterial2D text eol=lf
+*.fontsettings text eol=lf
+*.cubemap text eol=lf
+*.flare text eol=lf
+*.renderTexture text eol=lf
+*.lighting text eol=lf
+
+# C# source code - always LF
+*.cs text eol=lf diff=csharp
+*.csproj text eol=lf
+*.sln text eol=lf
+
+# Shell scripts - MUST be LF (won't execute on Unix with CRLF)
+*.sh text eol=lf
+
+# PowerShell scripts - LF for consistency
+*.ps1 text eol=lf
+
+# Python scripts - LF
+*.py text eol=lf
+
+# Configuration files - LF
+*.json text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.xml text eol=lf
+*.config text eol=lf
+
+# Documentation - LF
+*.md text eol=lf
+*.txt text eol=lf
+
+# Binary files - never modify
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.bmp binary
+*.tga binary
+*.tif binary
+*.tiff binary
+*.iff binary
+*.pict binary
+*.dds binary
+*.xcf binary
+*.psd binary
+*.psb binary
+*.ai binary
+*.exr binary
+*.hdr binary
+
+# 3D models - binary
+*.fbx binary
+*.obj binary
+*.max binary
+*.blend binary
+*.dae binary
+*.mb binary
+*.ma binary
+*.3ds binary
+
+# Audio - binary
+*.mp3 binary
+*.wav binary
+*.ogg binary
+*.aif binary
+*.aiff binary
+*.mod binary
+*.it binary
+*.s3m binary
+*.xm binary
+
+# Video - binary
+*.mp4 binary
+*.mov binary
+*.avi binary
+*.asf binary
+*.mpg binary
+*.mpeg binary
+*.flv binary
+*.wmv binary
+
+# Fonts - binary
+*.ttf binary
+*.otf binary
+
+# Archives/Packages - binary
+*.zip binary
+*.7z binary
+*.gz binary
+*.rar binary
+*.tar binary
+*.unitypackage binary
+
+# Compiled libraries - binary
+*.dll binary
+*.so binary
+*.dylib binary
+*.a binary
+*.lib binary
+*.pdb binary
+*.mdb binary
+
+# Unity cache and build files - binary
+*.sbsar binary
+*.unity3d binary
+*.bundle binary
+*.assetbundle binary

@@ -22,9 +22,13 @@ public class RockObstacle : MonoBehaviour
         // Visual rock is roughly 24-28px of usable space = 1.5-1.75 world units
         // Reduce radius to match visible rock shape more closely
         obstacleCollider = gameObject.AddComponent<CircleCollider2D>();
-        obstacleCollider.radius = 0.75f; // Tighter fit to visible rock shape
+        obstacleCollider.radius = 0.6f; // Tight fit to visible rock core (20% smaller)
         obstacleCollider.isTrigger = false; // Physical collision blocks movement
-        
+
+        // Add static Rigidbody2D for proper collision detection
+        Rigidbody2D rb = gameObject.AddComponent<Rigidbody2D>();
+        rb.bodyType = RigidbodyType2D.Static; // Immovable object
+
         // Set layer to Obstacles (will create if needed)
         int obstacleLayer = LayerMask.NameToLayer("Obstacles");
         if (obstacleLayer == -1)
@@ -45,71 +49,15 @@ public class RockObstacle : MonoBehaviour
         {
             return rockSprite;
         }
-        
+
         // Load from Resources
         rockSprite = Resources.Load<Sprite>("Sprites/Objects/rock_medium_mossy");
         if (rockSprite == null)
         {
-            DebugLog.Error("[RockObstacle] Failed to load rock_medium_mossy sprite from Resources");
-            rockSprite = CreateFallbackRockSprite();
+            DebugLog.Error("[RockObstacle] MISSING SPRITE: Sprites/Objects/rock_medium_mossy");
         }
-        
+
         return rockSprite;
-    }
-    
-    /// <summary>
-    /// Create a fallback procedural rock sprite with grey texture and noise
-    /// </summary>
-    private Sprite CreateFallbackRockSprite()
-    {
-        int resolution = 32;
-        Texture2D texture = new Texture2D(resolution, resolution);
-        texture.filterMode = FilterMode.Point;
-        
-        // Rock colors (grey scale)
-        Color rockBase = new Color(0.5f, 0.5f, 0.5f);
-        Color rockDark = new Color(0.3f, 0.3f, 0.3f);
-        Color rockLight = new Color(0.65f, 0.65f, 0.65f);
-        
-        // Draw circular rock with noise texture
-        Vector2 center = new Vector2(resolution / 2f, resolution / 2f);
-        float radius = resolution * 0.45f;
-        
-        for (int x = 0; x < resolution; x++)
-        {
-            for (int y = 0; y < resolution; y++)
-            {
-                float dist = Vector2.Distance(new Vector2(x, y), center);
-                
-                if (dist < radius)
-                {
-                    // Add Perlin noise for rock texture
-                    float noise = Mathf.PerlinNoise(x * 0.15f, y * 0.15f);
-                    Color rockColor = Color.Lerp(rockDark, rockBase, noise);
-                    
-                    // Add some lighter spots for highlights
-                    float highlightNoise = Mathf.PerlinNoise(x * 0.3f + 10f, y * 0.3f + 10f);
-                    if (highlightNoise > 0.7f)
-                    {
-                        rockColor = Color.Lerp(rockColor, rockLight, (highlightNoise - 0.7f) * 3f);
-                    }
-                    
-                    // Darken edges for 3D effect
-                    float edgeFade = 1f - (dist / radius);
-                    edgeFade = Mathf.Pow(edgeFade, 0.7f); // Softer falloff
-                    rockColor = Color.Lerp(rockDark, rockColor, edgeFade);
-                    
-                    texture.SetPixel(x, y, rockColor);
-                }
-                else
-                {
-                    texture.SetPixel(x, y, Color.clear);
-                }
-            }
-        }
-        
-        texture.Apply();
-        return Sprite.Create(texture, new Rect(0, 0, resolution, resolution), new Vector2(0.5f, 0.5f), 16);
     }
     
     /// <summary>

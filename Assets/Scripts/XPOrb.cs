@@ -65,20 +65,48 @@ public class XPOrb : MonoBehaviour
         playerTransform = player;
         isActive = true;
         gameObject.SetActive(true);
-        
+
         // Load XP gem sprite if missing (from Resources or procedural fallback)
         if (spriteRenderer.sprite == null)
         {
             spriteRenderer.sprite = SpriteLoader.LoadXPGemSprite();
         }
-        
+
+        UpdateVisuals();
+
+        DebugLog.Verbose($"[XPOrb] Activated with {xpValue} XP, color={spriteRenderer.color}");
+    }
+
+    /// <summary>
+    /// Merge additional XP into this orb (used when pool is full)
+    /// </summary>
+    public void MergeXP(int additionalXP)
+    {
+        xpValue += additionalXP;
+        UpdateVisuals();
+        DebugLog.Info($"[XPOrb] Merged +{additionalXP} XP, now worth {xpValue} XP (yellow orb)");
+    }
+
+    /// <summary>
+    /// Update orb visuals based on XP value
+    /// </summary>
+    private void UpdateVisuals()
+    {
         if (spriteRenderer != null)
         {
-            spriteRenderer.color = Color.white; // Use sprite's own colors
-            transform.localScale = Vector3.one * 0.4f; // Smaller XP orbs
+            // Only change color/size for merged orbs (2+ XP)
+            if (xpValue > 1)
+            {
+                spriteRenderer.color = Color.yellow; // Highlight merged orbs
+                transform.localScale = Vector3.one * 0.5f; // Slightly larger for merged orbs
+            }
+            else
+            {
+                // Normal orbs: keep original appearance
+                spriteRenderer.color = Color.white; // Use sprite's own colors
+                transform.localScale = Vector3.one * 0.4f; // Normal size
+            }
         }
-        
-        // XP Orb activated
     }
     
     /// <summary>
@@ -87,6 +115,7 @@ public class XPOrb : MonoBehaviour
     public void Deactivate()
     {
         isActive = false;
+        xpValue = 1; // Reset to default 1 XP
         gameObject.SetActive(false);
     }
     

@@ -3,14 +3,31 @@ using System.Collections.Generic;
 
 /// <summary>
 /// Abstract base class for all weapons.
-/// Handles fire rate, damage, and common weapon logic with individual upgrade tracking.
+/// Handles fire rate, damage, leveling, and common weapon logic.
+/// Power scaling comes from weapon levels, items, combinations, and player multipliers.
 /// </summary>
 public abstract class Weapon : MonoBehaviour
 {
+    /// <summary>
+    /// Global fire rate multiplier applied to all weapons (0.8 = 20% slower for slower-paced gameplay)
+    /// </summary>
+    public static float GlobalFireRateMultiplier = 0.8f;
+
+    /// <summary>
+    /// Maximum weapon level (1-3)
+    /// </summary>
+    public const int MaxLevel = 3;
+
+    /// <summary>
+    /// Event fired when a weapon levels up. Args: (Weapon weapon, int newLevel)
+    /// </summary>
+    public static event System.Action<Weapon, int> OnWeaponLevelUp;
+
+    [Header("Weapon Level")]
+    [SerializeField] protected int level = 1;
+
     [Header("Weapon Stats")]
     [SerializeField] protected string weaponName = "Weapon";
-    [SerializeField] protected int weaponLevel = 1;
-    [SerializeField] protected int maxWeaponLevel = 8;
     [SerializeField] protected float baseDamage = 10f;
     [SerializeField] protected float baseFireRate = 1f; // Shots per second
     [SerializeField] protected int projectileCount = 1;
@@ -20,13 +37,14 @@ public abstract class Weapon : MonoBehaviour
     [Header("Projectile Properties")]
     [Tooltip("Visual and collision size multiplier (1.0 = normal)")]
     [SerializeField] protected float projectileSize = 1f;
-    
+
     [Tooltip("Type of damage (affects future elemental interactions)")]
     [SerializeField] protected DamageType damageType = DamageType.Physical;
-    
-    // Individual upgrade tracking
-    protected Dictionary<WeaponUpgrade.UpgradeType, WeaponUpgrade> upgrades = new Dictionary<WeaponUpgrade.UpgradeType, WeaponUpgrade>();
-    
+
+    [Header("Weapon Tags")]
+    [Tooltip("Tags for synergy bonuses (matching tags across weapons = damage multipliers)")]
+    [SerializeField] protected List<WeaponTag> weaponTags = new List<WeaponTag>();
+
     // Calculated stats
     protected int currentProjectileCount;
     protected float currentDamage;
@@ -48,15 +66,7 @@ public abstract class Weapon : MonoBehaviour
         player = GetComponentInParent<Player>();
         if (playerTransform == null)
             playerTransform = transform.parent;
-        
-        // Initialize upgrade dictionary
-        upgrades[WeaponUpgrade.UpgradeType.Damage] = new WeaponUpgrade(WeaponUpgrade.UpgradeType.Damage, 10);
-        upgrades[WeaponUpgrade.UpgradeType.ProjectileCount] = new WeaponUpgrade(WeaponUpgrade.UpgradeType.ProjectileCount, 5);
-        upgrades[WeaponUpgrade.UpgradeType.FireRate] = new WeaponUpgrade(WeaponUpgrade.UpgradeType.FireRate, 8);
-        upgrades[WeaponUpgrade.UpgradeType.Pierce] = new WeaponUpgrade(WeaponUpgrade.UpgradeType.Pierce, 5);
-        upgrades[WeaponUpgrade.UpgradeType.Range] = new WeaponUpgrade(WeaponUpgrade.UpgradeType.Range, 5);
-        upgrades[WeaponUpgrade.UpgradeType.ProjectileSize] = new WeaponUpgrade(WeaponUpgrade.UpgradeType.ProjectileSize, 5);
-            
+
         RecalculateStats();
     }
     
@@ -73,6 +83,49 @@ public abstract class Weapon : MonoBehaviour
         this.playerTransform = playerTransform;
         this.player = player;
         RecalculateStats();
+    }
+
+    /// <summary>
+    /// Initialize combined weapon with inheritance data from parent weapons.
+    /// Combined weapons should override this to apply inherited stats.
+    /// </summary>
+    public virtual void InitializeWithInheritance(Transform playerTransform, Player player, WeaponInheritanceData inheritanceData)
+    {
+        this.playerTransform = playerTransform;
+        this.player = player;
+
+        // Apply inherited stats (combined weapons can override to customize behavior)
+        ApplyInheritedStats(inheritanceData);
+
+        RecalculateStats();
+
+        DebugLog.Info($"[Weapon] {weaponName} initialized with inheritance: damage={baseDamage:F1}, fireRate={baseFireRate:F1}, tags={string.Join(",", weaponTags)}");
+    }
+
+    /// <summary>
+    /// Apply inherited stats from parent weapons.
+    /// Combined weapons can override this for custom stat inheritance behavior.
+    /// </summary>
+    protected virtual void ApplyInheritedStats(WeaponInheritanceData inheritanceData)
+    {
+        if (inheritanceData == null)
+        {
+            DebugLog.Warning($"[Weapon] {weaponName}: No inheritance data provided");
+            return;
+        }
+
+        // Inherit stats (better of both × tier multiplier)
+        baseDamage = inheritanceData.GetInheritedDamage();
+        baseFireRate = inheritanceData.GetInheritedFireRate();
+        projectileCount = inheritanceData.GetInheritedProjectileCount();
+        basePierce = inheritanceData.GetInheritedPierce();
+        baseRange = inheritanceData.GetInheritedRange();
+        projectileSize = inheritanceData.GetInheritedProjectileSize();
+
+        // Inherit tags (union of both parent tags) - THIS IS THE KEY!
+        weaponTags = inheritanceData.GetInheritedTags();
+
+        DebugLog.Info($"[Weapon.ApplyInheritedStats] {weaponName}: Inherited {weaponTags.Count} tags from parents");
     }
     
     /// <summary>
@@ -99,29 +152,14 @@ public abstract class Weapon : MonoBehaviour
     
     protected virtual void Update()
     {
-        // Debug logging - only log occasionally
-        if (Time.frameCount % 120 == 0) // Every 2 seconds
-        {
-            DebugLog.Verbose($"[Weapon.Update] Called on {GetType().Name}, phase={GamePhaseManager.CurrentPhase}, paused={GameState.IsPaused}, timeSinceLastFire={timeSinceLastFire:F2}");
-        }
-        
         // ONLY fire weapons during gameplay phase
-        if (GamePhaseManager.CurrentPhase != GamePhase.Gameplay)
-        {
-            if (Time.frameCount % 60 == 0) // Log once per second
-            {
-                DebugLog.Warning($"[Weapon] Cannot fire - current phase is {GamePhaseManager.CurrentPhase}, need Gameplay");
-            }
-            return;
-        }
-        
+        if (GamePhaseManager.CurrentPhase != GamePhase.Gameplay) return;
         if (GameState.IsPaused) return;
-        
+
         timeSinceLastFire += Time.deltaTime;
-        
+
         if (timeSinceLastFire >= 1f / currentFireRate)
         {
-            DebugLog.Verbose($"[Weapon] Firing {GetType().Name}, timeSinceLastFire={timeSinceLastFire:F2}, fireRate={currentFireRate:F2}");
             Fire();
             timeSinceLastFire = 0f;
         }
@@ -131,112 +169,179 @@ public abstract class Weapon : MonoBehaviour
     /// Fire the weapon. Override in subclasses.
     /// </summary>
     protected abstract void Fire();
-    
+
     /// <summary>
-    /// Apply a specific upgrade to this weapon
+    /// Get the damage multiplier from weapon level.
+    /// +20% per level above 1 (Level 2 = 1.2x, Level 5 = 1.8x)
     /// </summary>
-    public virtual bool ApplyUpgrade(WeaponUpgrade.UpgradeType upgradeType)
+    protected virtual float GetLevelDamageMultiplier()
     {
-        if (!upgrades.ContainsKey(upgradeType))
-        {
-            DebugLog.Warning($"[Weapon] {weaponName} does not have upgrade type: {upgradeType}");
-            return false;
-        }
-        
-        WeaponUpgrade upgrade = upgrades[upgradeType];
-        if (!upgrade.CanUpgrade)
-        {
-            DebugLog.Warning($"[Weapon] {weaponName} upgrade {upgradeType} is already maxed");
-            return false;
-        }
-        
-        upgrade.currentLevel++;
-        weaponLevel++; // Overall weapon level increases
-        RecalculateStats();
-        
-        DebugLog.Info($"[Weapon] {weaponName} upgraded {upgradeType} to level {upgrade.currentLevel} (weapon level {weaponLevel})");
-        return true;
+        return 1f + (level - 1) * 0.2f;
     }
-    
+
     /// <summary>
-    /// Get all available upgrades for this weapon
+    /// Get the fire rate multiplier from weapon level.
+    /// +10% per level above 1 (Level 2 = 1.1x, Level 5 = 1.4x)
     /// </summary>
-    public List<WeaponUpgrade> GetAvailableUpgrades()
+    protected virtual float GetLevelFireRateMultiplier()
     {
-        List<WeaponUpgrade> available = new List<WeaponUpgrade>();
-        foreach (var upgrade in upgrades.Values)
-        {
-            if (upgrade.CanUpgrade)
-                available.Add(upgrade);
-        }
-        return available;
+        return 1f + (level - 1) * 0.1f;
     }
-    
+
     /// <summary>
-    /// Level up the weapon, improving its stats (legacy method - now use ApplyUpgrade)
+    /// Get bonus projectiles from weapon level milestones.
+    /// +1 projectile at max level (level 3)
     /// </summary>
-    public virtual void LevelUp()
+    protected virtual int GetLevelBonusProjectiles()
     {
-        weaponLevel++;
-        ApplyLevelUpgrades();
-        RecalculateStats();
-        DebugLog.Info($"[Weapon] {weaponName} leveled up to {weaponLevel}");
+        return level >= MaxLevel ? 1 : 0;
     }
-    
+
     /// <summary>
-    /// Apply level-specific upgrades (override in subclasses for custom scaling)
+    /// Get bonus pierce from weapon level milestones.
+    /// Currently no pierce bonus (reserved for future items/upgrades)
     /// </summary>
-    protected virtual void ApplyLevelUpgrades()
+    protected virtual int GetLevelBonusPierce()
     {
-        // Base implementation - subclasses override for custom behavior
+        return 0;
     }
-    
+
     /// <summary>
-    /// Recalculate weapon stats based on level and player multipliers.
+    /// Recalculate weapon stats based on level, player multipliers, and items.
+    /// Public so SynergyManager and ItemEffects can trigger recalculation.
     /// </summary>
-    protected virtual void RecalculateStats()
+    public virtual void RecalculateStats()
     {
-        // Damage: base + upgrade bonus + player multiplier
-        float damageUpgradeBonus = upgrades[WeaponUpgrade.UpgradeType.Damage].GetDamageBonus();
-        currentDamage = baseDamage * (1f + damageUpgradeBonus / 100f);
+        // Damage: base × level multiplier × player multiplier
+        currentDamage = baseDamage * GetLevelDamageMultiplier();
         if (player != null)
             currentDamage *= player.DamageMultiplier;
-        
-        DebugLog.Info($"[Weapon.RecalculateStats] {weaponName}: baseDamage={baseDamage:F1}, upgradeBonus={damageUpgradeBonus:F1}%, playerMult={player?.DamageMultiplier:F2} → currentDamage={currentDamage:F1}", "Weapon");
-        
-        // Fire rate: base + upgrade bonus + player attack speed
-        float fireRateUpgradeBonus = upgrades[WeaponUpgrade.UpgradeType.FireRate].GetFireRateBonus();
-        currentFireRate = baseFireRate * (1f + fireRateUpgradeBonus / 100f);
+
+        // Apply synergy bonuses (TODO: Remove this in future - tags should enable mechanics, not damage)
+        SynergyManager synergyManager = GameServices.SynergyManager;
+        if (synergyManager != null)
+        {
+            float synergyMultiplier = 1f;
+            foreach (WeaponTag tag in weaponTags)
+            {
+                synergyMultiplier += synergyManager.GetSynergyMultiplier(tag);
+            }
+            currentDamage *= synergyMultiplier;
+
+            if (synergyMultiplier > 1f)
+            {
+                DebugLog.Info($"[Weapon.Synergy] {weaponName} synergy multiplier: {synergyMultiplier:F2}x", "Weapon");
+            }
+        }
+
+        DebugLog.Info($"[Weapon.RecalculateStats] {weaponName} Lv.{level}: baseDamage={baseDamage:F1}, levelMult={GetLevelDamageMultiplier():F2}, playerMult={player?.DamageMultiplier:F2} → currentDamage={currentDamage:F1}", "Weapon");
+
+        // Fire rate: base × level multiplier × player attack speed × global multiplier
+        currentFireRate = baseFireRate * GetLevelFireRateMultiplier() * GlobalFireRateMultiplier;
         if (player != null)
             currentFireRate *= player.AttackSpeedMultiplier;
-        
-        // Projectile count: base + upgrade + player bonus
-        currentProjectileCount = projectileCount + upgrades[WeaponUpgrade.UpgradeType.ProjectileCount].GetProjectileBonus();
+
+        // Projectile count: base + level bonus + player bonus
+        currentProjectileCount = projectileCount + GetLevelBonusProjectiles();
         if (player != null)
             currentProjectileCount += player.BonusProjectiles;
-        
-        // Pierce: base + upgrade
-        currentPierce = basePierce + upgrades[WeaponUpgrade.UpgradeType.Pierce].GetPierceBonus();
-        
-        // Range: base + upgrade bonus
-        float rangeUpgradeBonus = upgrades[WeaponUpgrade.UpgradeType.Range].GetRangeBonus();
-        currentRange = baseRange * (1f + rangeUpgradeBonus / 100f);
-        
-        // Projectile Size: base + upgrade bonus
-        float sizeUpgradeBonus = upgrades[WeaponUpgrade.UpgradeType.ProjectileSize].GetSizeBonus();
-        currentProjectileSize = projectileSize * (1f + sizeUpgradeBonus / 100f);
+
+        // Pierce: base + level bonus (items will modify this in the future)
+        currentPierce = basePierce + GetLevelBonusPierce();
+
+        // Range: base only (items will modify this in the future)
+        currentRange = baseRange;
+
+        // Projectile Size: base only (items will modify this in the future)
+        currentProjectileSize = projectileSize;
     }
     
     // Public getters
     public string WeaponName => weaponName;
-    public int WeaponLevel => weaponLevel;
-    public int MaxWeaponLevel => maxWeaponLevel;
-    public bool IsMaxLevel => weaponLevel >= maxWeaponLevel;
     public float Damage => currentDamage;
     public float FireRate => currentFireRate;
     public int ProjectileCount => currentProjectileCount;
     public int Pierce => currentPierce;
     public float Range => currentRange;
     public float ProjectileSize => currentProjectileSize;
-    public Dictionary<WeaponUpgrade.UpgradeType, WeaponUpgrade> Upgrades => upgrades;
+    public List<WeaponTag> GetTags() => weaponTags;
+
+    // Level-related properties
+    public int Level => level;
+    public bool CanLevelUp => level < MaxLevel;
+    public bool CanCombine => level >= 2;
+
+    /// <summary>
+    /// Level up this weapon. Recalculates stats and fires event.
+    /// </summary>
+    public virtual void LevelUp()
+    {
+        if (!CanLevelUp)
+        {
+            DebugLog.Warning($"[Weapon] {weaponName} is already at max level ({MaxLevel})");
+            return;
+        }
+
+        level++;
+        RecalculateStats();
+        OnWeaponLevelUp?.Invoke(this, level);
+
+        DebugLog.Info($"[Weapon] {weaponName} leveled up to level {level}!");
+    }
+
+    /// <summary>
+    /// Check if weapon has a specific tag.
+    /// Used by item effects system for tag-based mechanics.
+    /// </summary>
+    public bool HasTag(WeaponTag tag) => weaponTags.Contains(tag);
+
+    #region Targeting Utilities
+
+    /// <summary>
+    /// Find the nearest enemy within range using spatial grid query.
+    /// </summary>
+    /// <param name="position">Origin position for distance calculation</param>
+    /// <param name="maxRange">Maximum range to search (required)</param>
+    /// <param name="exclude">Optional enemy to exclude from results</param>
+    /// <returns>Nearest enemy or null if none found</returns>
+    protected Enemy FindNearestEnemy(Vector3 position, float maxRange, Enemy exclude = null)
+    {
+        CollisionManager collisionMgr = GameServices.CollisionManager;
+        if (collisionMgr == null)
+        {
+            DebugLog.Error("[Weapon] CollisionManager is NULL! Cannot find enemies.");
+            return null;
+        }
+
+        var nearbyEntities = collisionMgr.QueryNearbyEnemies(position, maxRange);
+
+        Enemy nearest = null;
+        float nearestDistance = maxRange;
+
+        foreach (var entity in nearbyEntities)
+        {
+            if (!(entity is Enemy enemy) || !enemy.IsActive) continue;
+            if (exclude != null && enemy == exclude) continue;
+
+            float distance = Vector3.Distance(position, enemy.transform.position);
+            if (distance < nearestDistance)
+            {
+                nearestDistance = distance;
+                nearest = enemy;
+            }
+        }
+
+        return nearest;
+    }
+
+    /// <summary>
+    /// Find nearest enemy from player position.
+    /// </summary>
+    protected Enemy FindNearestEnemy(float maxRange)
+    {
+        if (playerTransform == null) return null;
+        return FindNearestEnemy(playerTransform.position, maxRange);
+    }
+
+    #endregion
 }

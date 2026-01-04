@@ -17,7 +17,10 @@ public abstract class BaseProjectile : MonoBehaviour, ICollidable
     protected HashSet<int> hitEnemyIDs = new HashSet<int>();
     protected DamageType damageType = DamageType.Physical;
     protected float size = 1f; // Size multiplier for visual and hitbox
-    
+
+    // Callback for when projectile hits an enemy (used for explosions, special effects, etc.)
+    public System.Action<BaseProjectile, Vector3> OnHitCallback { get; set; }
+
     public bool IsActive => isActive;
     public virtual float CollisionRadius => baseCollisionRadius * size; // Scale hitbox with size
     public float Damage => damage;

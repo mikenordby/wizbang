@@ -39,7 +39,11 @@ public class GameServices : MonoBehaviour
     private Player player;
     private DamageCalculator damageCalculator;
     private ItemDatabase itemDatabase;
-    
+    private SynergyManager synergyManager;
+    private CombinationManager combinationManager;
+    private ItemEffectsManager itemEffectsManager;
+    private WeaponDefinitionDatabase weaponDefinitionDatabase;
+
     // Public accessors with null safety
     public static XPOrbPool XPOrbPool => Instance?.xpOrbPool;
     public static EnemyPool EnemyPool => Instance?.enemyPool;
@@ -52,7 +56,11 @@ public class GameServices : MonoBehaviour
     public static Player Player => Instance?.player;
     public static DamageCalculator DamageCalculator => Instance?.damageCalculator;
     public static ItemDatabase ItemDatabase => Instance?.itemDatabase;
-    
+    public static SynergyManager SynergyManager => Instance?.synergyManager;
+    public static CombinationManager CombinationManager => Instance?.combinationManager;
+    public static ItemEffectsManager ItemEffectsManager => Instance?.itemEffectsManager;
+    public static WeaponDefinitionDatabase WeaponDefinitionDatabase => Instance?.weaponDefinitionDatabase;
+
     private void Awake()
     {
         // Enforce singleton
@@ -92,7 +100,19 @@ public class GameServices : MonoBehaviour
         player = FindFirstObjectByType<Player>();
         damageCalculator = FindFirstObjectByType<DamageCalculator>();
         itemDatabase = FindFirstObjectByType<ItemDatabase>();
-        
+        synergyManager = FindFirstObjectByType<SynergyManager>();
+        combinationManager = FindFirstObjectByType<CombinationManager>();
+        itemEffectsManager = FindFirstObjectByType<ItemEffectsManager>();
+        weaponDefinitionDatabase = FindFirstObjectByType<WeaponDefinitionDatabase>();
+
+        // Create WeaponDefinitionDatabase if not found (essential for data-driven weapons)
+        if (weaponDefinitionDatabase == null)
+        {
+            GameObject weaponDbObj = new GameObject("WeaponDefinitionDatabase");
+            weaponDefinitionDatabase = weaponDbObj.AddComponent<WeaponDefinitionDatabase>();
+            DebugLog.Info("[GameServices] Created WeaponDefinitionDatabase");
+        }
+
         // Create ItemDatabase if not found (essential for item system)
         if (itemDatabase == null)
         {
@@ -118,5 +138,70 @@ public class GameServices : MonoBehaviour
         if (levelUpUI == null) DebugLog.Warning("[GameServices] LevelUpUI not found");
         if (player == null) DebugLog.Warning("[GameServices] Player not found");
         if (damageCalculator == null) DebugLog.Warning("[GameServices] DamageCalculator not found");
+        if (synergyManager == null) DebugLog.Warning("[GameServices] SynergyManager not found");
+        if (combinationManager == null) DebugLog.Warning("[GameServices] CombinationManager not found");
+        if (itemEffectsManager == null) DebugLog.Warning("[GameServices] ItemEffectsManager not found - item effects will not work!");
+    }
+
+    // Manual registration methods (for services that register themselves)
+    public static void RegisterSynergyManager(SynergyManager manager)
+    {
+        if (Instance != null)
+        {
+            Instance.synergyManager = manager;
+            DebugLog.Info("[GameServices] SynergyManager registered");
+        }
+    }
+
+    public static void RegisterCombinationManager(CombinationManager manager)
+    {
+        if (Instance != null)
+        {
+            Instance.combinationManager = manager;
+            DebugLog.Info("[GameServices] CombinationManager registered");
+        }
+    }
+
+    public static void RegisterItemEffectsManager(ItemEffectsManager manager)
+    {
+        if (Instance != null)
+        {
+            Instance.itemEffectsManager = manager;
+            DebugLog.Info("[GameServices] ItemEffectsManager registered");
+        }
+    }
+
+    public static void RegisterWeaponDefinitionDatabase(WeaponDefinitionDatabase database)
+    {
+        if (Instance != null)
+        {
+            Instance.weaponDefinitionDatabase = database;
+            DebugLog.Info("[GameServices] WeaponDefinitionDatabase registered");
+        }
+    }
+
+    /// <summary>
+    /// Re-find services that might have been created after initial Awake().
+    /// Call this after character selection or scene changes.
+    /// </summary>
+    public static void RefreshServices()
+    {
+        if (Instance != null)
+        {
+            Instance.AutoFindServices();
+            DebugLog.Info("[GameServices] Services refreshed");
+        }
+    }
+
+    /// <summary>
+    /// Manually register the player (called after character selection)
+    /// </summary>
+    public static void RegisterPlayer(Player newPlayer)
+    {
+        if (Instance != null && newPlayer != null)
+        {
+            Instance.player = newPlayer;
+            DebugLog.Info($"[GameServices] Player registered: {newPlayer.name}");
+        }
     }
 }
